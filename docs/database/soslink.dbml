@@ -1,0 +1,427 @@
+// SOSLink — Database schema (PostgreSQL + PostGIS)
+// Xem trực quan: dán file này vào https://dbdiagram.io
+// Quy ước: khóa chính uuid, thời gian timestamptz (UTC).
+
+Project SOSLink {
+  database_type: 'PostgreSQL'
+  Note: 'Điều phối tin cầu cứu mùa lũ — TARGET V1'
+}
+
+// ============================================================ Enums
+
+Enum user_role {
+  VOLUNTEER
+  COORDINATOR
+  TEAM
+  ADMIN
+}
+
+Enum user_status {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+Enum event_status {
+  OPEN
+  CLOSED
+}
+
+Enum report_channel {
+  PUBLIC_FORM
+  VOLUNTEER_PASTE
+  ZALO_OA
+}
+
+Enum ai_status {
+  PENDING
+  OK
+  FAILED
+  TIMEOUT
+}
+
+Enum case_status {
+  NEW
+  TRIAGED
+  ASSIGNED
+  EN_ROUTE
+  RESOLVED
+  INVALID
+  MERGED
+}
+
+Enum priority {
+  P1
+  P2
+  P3
+  P4
+}
+
+Enum verification_status {
+  UNVERIFIED
+  REACHED
+  UNREACHABLE
+}
+
+Enum location_source {
+  GPS
+  GEOCODED
+  MANUAL_PIN
+  NONE
+}
+
+Enum merge_suggestion_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+Enum assignment_status {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  TIMED_OUT
+  EN_ROUTE
+  COMPLETED
+  CANCELLED
+}
+
+Enum assignment_outcome {
+  RESCUED
+  HANDLED_BY_OTHERS
+  CANNOT_REACH
+  NOT_FOUND
+}
+
+Enum team_status {
+  AVAILABLE
+  BUSY
+  OFF_DUTY
+}
+
+Enum vehicle_type {
+  BOAT
+  CAR
+  ON_FOOT
+  OTHER
+}
+
+Enum alert_type {
+  SLA_NOT_ASSIGNED
+  TEAM_NOT_ACCEPTED
+  TEAM_NO_UPDATE
+  NEW_INFO_ON_ACTIVE_CASE
+}
+
+// ============================================================ Tài khoản & cấu hình
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar(255) [not null, unique]
+  password_hash varchar(255) [note: 'null khi chưa kích hoạt']
+  full_name varchar(120) [not null]
+  phone varchar(20)
+  role user_role [not null]
+  status user_status [not null, default: 'INVITED']
+  team_id uuid [ref: > teams.id, note: 'Bắt buộc khi role = TEAM']
+  failed_login_count int [not null, default: 0]
+  locked_until timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'Không xóa cứng; chỉ DISABLED.'
+}
+
+Table invitations {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar(128) [not null, unique, note: 'SHA-256, không lưu token gốc']
+  expires_at timestamptz [not null, note: '7 ngày']
+  used_at timestamptz
+  created_by uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table disaster_events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(120) [not null]
+  area_description text
+  status event_status [not null, default: 'OPEN']
+  sla_p1_minutes int [not null, default: 10]
+  sla_p2_minutes int [not null, default: 30]
+  sla_p3_minutes int [not null, default: 120]
+  team_accept_minutes int [not null, default: 5]
+  team_update_minutes int [not null, default: 30]
+  opened_at timestamptz [not null, default: `now()`]
+  closed_at timestamptz
+  anonymized_at timestamptz [note: 'Ẩn danh sau 90 ngày kể từ closed_at']
+  created_by uuid [not null, ref: > users.id]
+}
+
+Table danger_keywords {
+  id uuid [pk, default: `gen_random_uuid()`]
+  keyword varchar(80) [not null, unique, note: 'So khớp sau khi bỏ dấu; chỉ dùng để nâng mức']
+  minimum_priority priority [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ============================================================ Tiếp nhận
+
+Table reports {
+  id uuid [pk, default: `gen_random_uuid()`]
+  event_id uuid [not null, ref: > disaster_events.id]
+  case_id uuid [ref: > cases.id, note: 'Ca mà tin thuộc về; đổi khi gộp hoặc hoàn tác']
+  channel report_channel [not null]
+  raw_text text [note: 'Tin gốc: không bao giờ sửa hay xóa trước khi ẩn danh']
+  source_url text
+  contact_phone varchar(20)
+  gps_lat numeric(9,6)
+  gps_lng numeric(9,6)
+  form_people_count int
+  form_vulnerable jsonb [note: 'Lựa chọn người gửi bấm trên form']
+  tracking_code varchar(12) [unique, note: 'Mã tra cứu công khai, ngẫu nhiên, không đoán được']
+  submitted_by uuid [ref: > users.id, note: 'null = người dân gửi trực tiếp']
+  idempotency_key uuid [unique, note: 'Chống gửi trùng khi mạng chập chờn']
+  ip_hash varchar(128) [note: 'Giới hạn tần suất; không lưu IP gốc']
+  ai_status ai_status [not null, default: 'PENDING']
+  received_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (event_id, received_at)
+    case_id
+    contact_phone
+  }
+
+  Note: 'Được lưu trước mọi xử lý AI (BR01).'
+}
+
+Table report_attachments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  report_id uuid [not null, ref: > reports.id]
+  storage_key text [not null]
+  mime_type varchar(30) [not null]
+  size_bytes int [not null, note: '≤ 5 MB']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table ai_extractions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  report_id uuid [not null, ref: > reports.id]
+  model varchar(60) [not null]
+  prompt_version varchar(20) [not null]
+  status ai_status [not null]
+  output jsonb [note: 'Kết quả gốc theo schema; xem 02-scope.md mục 5']
+  is_rescue_request boolean
+  suggested_priority priority
+  confidence numeric(3,2)
+  possibly_old boolean [not null, default: false]
+  latency_ms int
+  input_tokens int
+  output_tokens int
+  attempt smallint [not null, default: 1]
+  error text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (report_id, created_at)
+  }
+}
+
+// ============================================================ Ca
+
+Table cases {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(12) [not null, unique, note: 'VD: #1042']
+  event_id uuid [not null, ref: > disaster_events.id]
+  status case_status [not null, default: 'NEW']
+  priority priority [not null]
+  priority_reason text
+  needs_human_read boolean [not null, default: false, note: 'AI lỗi hoặc độ tin cậy thấp']
+  verification verification_status [not null, default: 'UNVERIFIED']
+  summary text
+  address_text text
+  commune_id uuid [ref: > admin_units.id]
+  location_source location_source [not null, default: 'NONE']
+  location_confidence numeric(3,2)
+  lat numeric(9,6)
+  lng numeric(9,6)
+  phones jsonb
+  people_count int
+  vulnerable jsonb [note: 'ELDERLY, INFANT, CHILD, PREGNANT, INJURED, DISABLED']
+  needs jsonb
+  people_rescued int
+  merged_into_id uuid [ref: > cases.id, note: 'Khi status = MERGED']
+  invalid_reason text
+  sla_due_at timestamptz [note: 'Hạn phân công theo mức ưu tiên']
+  reviewed_by uuid [ref: > users.id]
+  reviewed_at timestamptz
+  resolved_at timestamptz
+  version int [not null, default: 0, note: 'Khóa lạc quan chống phân công trùng']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (event_id, status, priority, created_at) [note: 'Hàng đợi']
+    (status, sla_due_at) [note: 'Job cảnh báo quá hạn']
+    (lat, lng) [note: 'Có thể thay bằng GiST trên cột geography của PostGIS']
+  }
+}
+
+Table case_field_corrections {
+  id uuid [pk, default: `gen_random_uuid()`]
+  case_id uuid [not null, ref: > cases.id]
+  field varchar(40) [not null, note: 'address, phones, people_count, priority…']
+  ai_value jsonb
+  final_value jsonb
+  corrected_by uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Nguồn dữ liệu đo chất lượng AI (US20).'
+}
+
+Table merge_suggestions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  case_id uuid [not null, ref: > cases.id]
+  candidate_case_id uuid [not null, ref: > cases.id]
+  reason varchar(120) [not null, note: 'Trùng điện thoại; cách N m và nội dung tương tự']
+  score numeric(3,2)
+  status merge_suggestion_status [not null, default: 'PENDING']
+  decided_by uuid [ref: > users.id]
+  decided_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (case_id, candidate_case_id) [unique]
+  }
+}
+
+Table verification_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  case_id uuid [not null, ref: > cases.id]
+  result verification_status [not null]
+  note text
+  created_by uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table case_events {
+  id bigserial [pk]
+  case_id uuid [not null, ref: > cases.id]
+  type varchar(40) [not null, note: 'CREATED, PRIORITY_CHANGED, MERGED, ASSIGNED, TEAM_UPDATE…']
+  from_value jsonb
+  to_value jsonb
+  note text
+  actor_id uuid [ref: > users.id, note: 'null = SYSTEM']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (case_id, created_at)
+  }
+
+  Note: 'Dòng thời gian của ca; chỉ ghi thêm.'
+}
+
+Table admin_units {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(10) [not null, unique]
+  name varchar(120) [not null]
+  level varchar(10) [not null, note: 'PROVINCE | COMMUNE']
+  parent_id uuid [ref: > admin_units.id]
+
+  Note: 'Danh mục sau sáp nhập 2025 (hai cấp).'
+}
+
+// ============================================================ Đội & phân công
+
+Table teams {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(80) [not null, unique]
+  phone varchar(20) [not null]
+  vehicle vehicle_type [not null]
+  capacity int [note: 'Số người chở được']
+  status team_status [not null, default: 'AVAILABLE']
+  last_lat numeric(9,6)
+  last_lng numeric(9,6)
+  last_seen_at timestamptz
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table assignments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  case_id uuid [not null, ref: > cases.id]
+  team_id uuid [not null, ref: > teams.id]
+  status assignment_status [not null, default: 'OFFERED']
+  outcome assignment_outcome
+  people_rescued int
+  decline_reason text
+  note text
+  assigned_by uuid [not null, ref: > users.id]
+  accept_due_at timestamptz [not null]
+  accepted_at timestamptz
+  last_update_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (team_id, status)
+    (status, accept_due_at)
+    case_id
+  }
+
+  Note: 'Một ca có tối đa một phân công đang hiệu lực (partial unique index trên case_id).'
+}
+
+Table team_updates {
+  id uuid [pk, default: `gen_random_uuid()`]
+  assignment_id uuid [not null, ref: > assignments.id]
+  client_update_id uuid [not null, unique, note: 'Gửi lại khi mất mạng không tạo bản ghi trùng']
+  kind varchar(20) [not null, note: 'EN_ROUTE, OUTCOME, NOTE']
+  payload jsonb
+  entered_by uuid [not null, ref: > users.id, note: 'Đội trưởng hoặc điều phối viên cập nhật hộ']
+  occurred_at timestamptz [not null, note: 'Thời điểm trên máy']
+  received_at timestamptz [not null, default: `now()`]
+}
+
+// ============================================================ Cảnh báo, audit, job
+
+Table alerts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  case_id uuid [not null, ref: > cases.id]
+  assignment_id uuid [ref: > assignments.id]
+  type alert_type [not null]
+  acknowledged_by uuid [ref: > users.id]
+  acknowledged_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (case_id, type) [note: 'Partial unique khi chưa xác nhận: không báo lặp']
+    acknowledged_at
+  }
+}
+
+Table audit_logs {
+  id bigserial [pk]
+  actor_id uuid [ref: > users.id]
+  action varchar(60) [not null, note: 'VIEW_PHONE, EXPORT, LOGIN_FAILED, USER_DISABLED…']
+  entity_type varchar(40) [not null]
+  entity_id uuid
+  metadata jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id)
+    (actor_id, created_at)
+  }
+}
+
+Table job_runs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  job varchar(40) [not null, note: 'SLA_CHECK, AI_RETRY, ANONYMIZE']
+  status varchar(20) [not null]
+  processed_count int [not null, default: 0]
+  error text
+  started_at timestamptz [not null, default: `now()`]
+  finished_at timestamptz
+}

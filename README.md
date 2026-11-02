@@ -52,7 +52,9 @@ Tự quét mạng xã hội, thay thế tổng đài 112, bản đồ công khai
 
 ## 2. Product Mindmap
 
-Xem bản gốc trên Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Các ý quan trọng nhất được in đậm và tô đỏ.
+Xem bản gốc trên Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Mỗi nhánh có một màu riêng; các ý quan trọng nhất được in đậm màu đỏ.
+
+![SOSLink Product Mindmap](docs/mindmap/soslink-mindmap.png)
 
 ---
 

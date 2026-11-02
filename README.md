@@ -165,5 +165,3 @@ DBML gồm 19 bảng; **tách tin gốc (`reports`) khỏi ca đã chuẩn hóa 
 | 7 | C4 Documentation | — | ⏳ Chưa làm |
 | 8 | Code structure | — | ⏳ Chưa làm |
 | 9 | Code | — | ⏳ Chưa làm |
-
-Slide deck: [slides/SOSLink-deck.pptx](slides/SOSLink-deck.pptx) · [hướng dẫn nhập vào Google Slides và thêm hiệu ứng](slides/README.md).

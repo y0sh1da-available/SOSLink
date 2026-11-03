@@ -1,0 +1,3332 @@
+openapi: 3.0.4
+info:
+  title: SOSLink API
+  version: 1.0.0
+  description: |
+    REST contract of SOSLink, covering intake, case review, assignment, rescue team missions,
+    reports and administration.
+
+    The backend is the authorization boundary: each operation checks the roles in `x-roles` and the limits in
+    `x-scope`. `x-stories` lists the user stories the operation serves.
+
+    This document is a design contract (TARGET V1). No operation runs yet.
+  contact:
+    name: SOSLink
+servers:
+  - url: /api/v1
+    description: Version 1, relative to the deployment host
+  - url: http://localhost:5000/api/v1
+    description: Development machine
+tags:
+  - name: Public
+    description: Residents send messages and look up by code. No token needed, never returns personal data.
+  - name: Auth
+    description: Login, logout, account activation by invitation link.
+  - name: Profile
+    description: Profile of the logged-in user. The role cannot be changed.
+  - name: Events
+    description: Disaster events and the deadlines of each event.
+  - name: Config
+    description: Danger keywords and administrative units.
+  - name: Reports
+    description: Original messages. Not edited or deleted before anonymisation (BR01).
+  - name: Cases
+    description: Normalised cases, covering review, editing, merging, verification and the timeline.
+  - name: Dispatch
+    description: Team suggestions and assignment. Only people assign (BR14).
+  - name: Alerts
+    description: Alerts for coordinators. The Worker creates them, a person acknowledges them.
+  - name: Teams
+    description: Rescue teams, vehicles, areas and status.
+  - name: Missions
+    description: 'Rescue team screens: accept, decline and report outcomes, even offline.'
+  - name: Analytics
+    description: Dashboard, after-action report, AI quality, data export.
+  - name: Users
+    description: Account management. No hard delete.
+  - name: Audit
+    description: Log of sensitive actions.
+  - name: Webhooks
+    description: External channels sending messages into the system.
+  - name: System
+    description: Service health checks.
+security:
+  - bearerAuth: []
+paths:
+  /public/form-status:
+    get:
+      tags: [Public]
+      summary: Check whether the form is accepting messages
+      description: |
+        With no open event, `accepting` is `false`; the form stops accepting messages and only shows 112.
+        With several open events, the frontend shows a list for the sender to choose from.
+      operationId: getFormStatus
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US03, US23]
+      responses:
+        '200':
+          description: Form status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FormStatus'}
+              examples:
+                oneOpenEvent: {$ref: '#/components/examples/FormStatusExample'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /public/reports:
+    post:
+      tags: [Public]
+      summary: Send a call for help
+      description: |
+        Saves the original before any AI processing and returns a tracking code at once (BR01, BR07). Must have `gps` or `placeText`.
+        The server joins `placeText` and `situationText` into `reports.raw_text`.
+
+        Resending the same `idempotencyKey` returns `200` with the existing code and creates no duplicate.
+        An IP sending over 10 messages in 10 minutes gets `429` with a `confirmToken`. The sender confirms and resends
+        the same content; the system never silently drops a message.
+      operationId: submitPublicReport
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US03]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublicReportRequest'}
+            examples:
+              withGps: {$ref: '#/components/examples/PublicReportRequestExample'}
+      responses:
+        '201':
+          description: Message saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicReportCreated'}
+              examples:
+                created: {$ref: '#/components/examples/PublicReportCreatedExample'}
+        '200':
+          description: Resent with the same `idempotencyKey`; returns the issued code
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicReportCreated'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '409':
+          description: |
+            `EVENT_CLOSED` when no event is open. `EVENT_SELECTION_REQUIRED` when several are open and no `eventId` was chosen.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemDetails'}
+        '429': {$ref: '#/components/responses/ConfirmationRequired'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /public/reports/{trackingCode}/attachments:
+    post:
+      tags: [Public]
+      summary: Send an image with a message
+      description: |
+        Sent after the tracking code is issued, one image at a time, so a weak network cannot lose the text.
+        Up to 4 images, each up to 5 MB.
+      operationId: uploadPublicAttachment
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US03]
+      parameters:
+        - {$ref: '#/components/parameters/TrackingCodePath'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary, description: 'JPEG, PNG or WebP image'}
+      responses:
+        '201':
+          description: Image saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AttachmentRef'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/AttachmentLimitReached'}
+        '413': {$ref: '#/components/responses/FileTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /public/track/{trackingCode}:
+    get:
+      tags: [Public]
+      summary: Look up status by code
+      description: |
+        Returns general steps only, with no name, phone or address (BR19). Anyone with the code can see it.
+        A merged case follows the main case. A not-verified case shows as `CLOSED`, with no reason.
+      operationId: trackReport
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US04]
+      parameters:
+        - {$ref: '#/components/parameters/TrackingCodePath'}
+      responses:
+        '200':
+          description: Steps reached
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TrackResponse'}
+              examples:
+                teamAssigned: {$ref: '#/components/examples/TrackExample'}
+        '404':
+          description: '`TRACKING_CODE_NOT_FOUND`'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemDetails'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      description: |
+        Returns a 60-minute JWT. Every failure, including an account locked for 15 minutes after 5 failures,
+        returns the same `AUTH_INVALID_CREDENTIALS` error, so it does not reveal whether an account exists.
+      operationId: login
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US01]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+            examples:
+              coordinator: {$ref: '#/components/examples/LoginRequestExample'}
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginResponse'}
+              examples:
+                coordinator: {$ref: '#/components/examples/LoginSuccessExample'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/InvalidCredentials'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      description: The client deletes the token and locally stored data. V1 has no refresh token and no server-side revocation.
+      operationId: logout
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US01]
+      responses:
+        '204': {description: 'Logout acknowledged'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /auth/invitations/inspect:
+    post:
+      tags: [Auth]
+      summary: View invitation link details
+      description: Uses POST so the token stays in the body, out of access logs. Wrong, expired or used tokens all return the same error.
+      operationId: inspectInvitation
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US21]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InvitationTokenRequest'}
+      responses:
+        '200':
+          description: Details to show at SCR-05
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvitationInfo'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '410': {$ref: '#/components/responses/InvitationInvalid'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /auth/invitations/accept:
+    post:
+      tags: [Auth]
+      summary: Activate account
+      description: Sets name and password and moves the account to `ACTIVE`. The link stops working immediately after use.
+      operationId: acceptInvitation
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: [US21]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InvitationAcceptRequest'}
+      responses:
+        '204': {description: 'Activated'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '410': {$ref: '#/components/responses/InvitationInvalid'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /me:
+    get:
+      tags: [Profile]
+      summary: View my profile
+      operationId: getMyProfile
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US02]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserProfile'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    patch:
+      tags: [Profile]
+      summary: Edit name and phone
+      operationId: updateMyProfile
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US02]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProfileUpdateRequest'}
+      responses:
+        '200':
+          description: Profile after editing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserProfile'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /me/password:
+    post:
+      tags: [Profile]
+      summary: Change password
+      description: A wrong old password returns `400` with `errorCode` `PASSWORD_INCORRECT`.
+      operationId: changeMyPassword
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US02]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PasswordChangeRequest'}
+      responses:
+        '204': {description: 'Password changed'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /events:
+    get:
+      tags: [Events]
+      summary: List disaster events
+      description: Used by the event picker in the top bar, SCR-50 and the anonymisation table at SCR-54.
+      operationId: listEvents
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US23, US24]
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/EventStatus'}, description: Filter by status}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of disaster events, newest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EventPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    post:
+      tags: [Events]
+      summary: Open a new event
+      description: Deadlines take default values, edited later with `updateEvent`. Several events can be open at once.
+      operationId: openEvent
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EventCreateRequest'}
+      responses:
+        '201':
+          description: Event opened
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Event'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /events/{eventId}:
+    parameters:
+      - {$ref: '#/components/parameters/EventIdPath'}
+    get:
+      tags: [Events]
+      summary: Event detail
+      operationId: getEvent
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-stories: [US23]
+      responses:
+        '200':
+          description: Disaster event
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Event'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    patch:
+      tags: [Events]
+      summary: Edit name, area and deadlines
+      description: New deadlines apply to cases created after saving.
+      operationId: updateEvent
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EventUpdateRequest'}
+      responses:
+        '200':
+          description: Event after editing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Event'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /events/{eventId}/close:
+    post:
+      tags: [Events]
+      summary: Close event
+      description: The public form stops accepting messages for this event. The anonymisation deadline counts from closing (BR21).
+      operationId: closeEvent
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      responses:
+        '200':
+          description: Event closed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Event'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /events/{eventId}/overview:
+    get:
+      tags: [Events]
+      summary: Counters for the top bar
+      description: P1 cases with no team, cases awaiting review, cases with no location, unacknowledged alerts.
+      operationId: getEventOverview
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US14, US16]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      responses:
+        '200':
+          description: Counters
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EventOverview'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /danger-keywords:
+    get:
+      tags: [Config]
+      summary: List danger keywords
+      operationId: listDangerKeywords
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      responses:
+        '200':
+          description: Keywords in use
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/DangerKeyword'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    post:
+      tags: [Config]
+      summary: Add a keyword
+      description: Keywords only raise the level, never lower it (BR04).
+      operationId: addDangerKeyword
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DangerKeywordCreateRequest'}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DangerKeyword'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /danger-keywords/{keywordId}:
+    delete:
+      tags: [Config]
+      summary: Remove a keyword
+      description: Sets `is_active` to `false`; the record is not deleted.
+      operationId: removeDangerKeyword
+      x-roles: [ADMIN]
+      x-stories: [US23]
+      parameters:
+        - {name: keywordId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204': {description: 'Removed'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /admin-units:
+    get:
+      tags: [Config]
+      summary: List provinces and communes
+      description: The list after the 2025 merger. Used to filter cases by area and to pick a commune during review.
+      operationId: listAdminUnits
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US14]
+      parameters:
+        - {name: level, in: query, schema: {type: string, enum: [PROVINCE, COMMUNE]}}
+        - {name: parentId, in: query, schema: {type: string, format: uuid}}
+        - {name: q, in: query, schema: {type: string}, description: Search by name}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of administrative units
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminUnitPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /reports:
+    post:
+      tags: [Reports]
+      summary: Enter a message from social media
+      description: |
+        Must have text or at least one image. Saved and returned within 2 seconds; AI processes in the background (BR07).
+        Up to 4 images, each up to 5 MB. Resending the same `idempotencyKey` returns `200` with the existing message.
+      operationId: createReport
+      x-roles: [VOLUNTEER, COORDINATOR, ADMIN]
+      x-stories: [US05]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/ReportCreateForm'}
+            encoding:
+              photos: {contentType: 'image/jpeg, image/png, image/webp'}
+      responses:
+        '201':
+          description: Message saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSummary'}
+        '200':
+          description: Resent with the same `idempotencyKey`; returns the saved message
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSummary'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: '`EVENT_CLOSED` when the event is closed'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemDetails'}
+        '413': {$ref: '#/components/responses/FileTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    get:
+      tags: [Reports]
+      summary: List messages
+      description: '`VOLUNTEER` always gets only their own messages, regardless of `mine` (BR20).'
+      operationId: listReports
+      x-roles: [VOLUNTEER, COORDINATOR, ADMIN]
+      x-scope: 'VOLUNTEER: messages they entered'
+      x-stories: [US05, US13]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdQuery'}
+        - {name: mine, in: query, schema: {type: boolean, default: false}}
+        - {name: caseStatus, in: query, schema: {$ref: '#/components/schemas/CaseStatus'}}
+        - {name: aiStatus, in: query, schema: {$ref: '#/components/schemas/AiStatus'}}
+        - {name: channel, in: query, schema: {$ref: '#/components/schemas/ReportChannel'}}
+        - {name: receivedFrom, in: query, schema: {type: string, format: date-time}}
+        - {name: q, in: query, schema: {type: string}, description: Search message content}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of messages, newest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /reports/{reportId}:
+    get:
+      tags: [Reports]
+      summary: Original message detail
+      operationId: getReport
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-scope: 'VOLUNTEER: messages they entered. TEAM: messages of the assigned case, while the mission runs (BR20)'
+      x-stories: [US05, US07]
+      parameters:
+        - {$ref: '#/components/parameters/ReportIdPath'}
+      responses:
+        '200':
+          description: Original message
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /reports/{reportId}/attachments/{attachmentId}:
+    get:
+      tags: [Reports]
+      summary: Download a message image
+      operationId: downloadReportAttachment
+      x-roles: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]
+      x-scope: Same limits as getReport
+      x-stories: [US05, US11, US17]
+      parameters:
+        - {$ref: '#/components/parameters/ReportIdPath'}
+        - {name: attachmentId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Image content
+          content:
+            image/*:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /cases:
+    get:
+      tags: [Cases]
+      summary: List cases, queue and map data
+      description: |
+        Sorted by priority then waiting time by default. Cases with no location stay in the results (`hasLocation=false`).
+        After reconnecting realtime, the client calls again with `updatedSince` to fetch what it missed.
+      operationId: listCases
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US10, US11, US14]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdQueryRequired'}
+        - name: status
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/CaseStatus'}
+        - name: priority
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: {$ref: '#/components/schemas/Priority'}
+        - {name: needsHumanRead, in: query, schema: {type: boolean}}
+        - {name: hasLocation, in: query, schema: {type: boolean}}
+        - {name: overdue, in: query, schema: {type: boolean}, description: Past the assignment deadline}
+        - {name: communeId, in: query, schema: {type: string, format: uuid}}
+        - {name: teamId, in: query, schema: {type: string, format: uuid}}
+        - {name: q, in: query, schema: {type: string}, description: 'Search case code, place, condition'}
+        - {name: updatedSince, in: query, schema: {type: string, format: date-time}}
+        - name: sort
+          in: query
+          schema: {type: string, enum: [queue, newest], default: queue}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of cases
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CasePage'}
+              examples:
+                queue: {$ref: '#/components/examples/CaseListExample'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}:
+    parameters:
+      - {$ref: '#/components/parameters/CaseIdPath'}
+    get:
+      tags: [Cases]
+      summary: Case detail
+      description: |
+        Includes original messages, the latest AI result, merge suggestions, the active assignment and verification history (BR05).
+        Phone numbers here are masked; see full numbers with `revealCasePhones`.
+      operationId: getCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US07, US08, US09, US10, US11, US13]
+      responses:
+        '200':
+          description: Case
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+              examples:
+                onRoof: {$ref: '#/components/examples/CaseDetailExample'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    patch:
+      tags: [Cases]
+      summary: Edit case information
+      description: |
+        Stores both the AI value and the final human value to measure AI quality. Must send the current `version`.
+        Lowering priority requires `priorityReason`; raising it does not (AC-US11).
+      operationId: updateCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US10, US11]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaseUpdateRequest'}
+            examples:
+              raisePriority: {$ref: '#/components/examples/CaseUpdateExample'}
+      responses:
+        '200':
+          description: Case after editing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '422': {$ref: '#/components/responses/PriorityReasonRequired'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/phones/reveal:
+    post:
+      tags: [Cases]
+      summary: View full phone numbers
+      description: Each call writes a `VIEW_PHONE` row to the audit log (BR22).
+      operationId: revealCasePhones
+      x-roles: [VOLUNTEER, COORDINATOR, ADMIN]
+      x-scope: 'VOLUNTEER: cases with a message they entered'
+      x-stories: [US13, US24]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PhoneRevealRequest'}
+      responses:
+        '200':
+          description: Full numbers
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PhoneRevealResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/location:
+    put:
+      tags: [Cases]
+      summary: Pin a location on the map
+      description: Overrides the automatic geocoding result, sets `locationSource` to `MANUAL_PIN` and writes to the timeline (AC-US08).
+      operationId: pinCaseLocation
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US08]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LocationPinRequest'}
+      responses:
+        '200':
+          description: Case after pinning
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/review:
+    post:
+      tags: [Cases]
+      summary: Review a case
+      description: Moves `NEW` to `TRIAGED`. A case can still be reviewed from the original message while AI is reading or has failed.
+      operationId: reviewCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US11]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VersionRequest'}
+      responses:
+        '200':
+          description: Case reviewed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/invalidate:
+    post:
+      tags: [Cases]
+      summary: Close a case as not verified
+      description: Applies to `NEW` or `TRIAGED` cases, a reason is required (BR13). Only a person can reject a message.
+      operationId: invalidateCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US11]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaseInvalidateRequest'}
+      responses:
+        '200':
+          description: Case closed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/resolve:
+    post:
+      tags: [Cases]
+      summary: Close a case handled by another force
+      description: Moves `TRIAGED` to `RESOLVED` when no team is needed. Outcomes reported by a team go through `submitMissionUpdate`.
+      operationId: resolveCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US18]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CaseResolveRequest'}
+      responses:
+        '200':
+          description: Case closed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/timeline:
+    get:
+      tags: [Cases]
+      summary: Case timeline
+      description: Who did what, when (BR17). Append only.
+      operationId: getCaseTimeline
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US11, US18]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      responses:
+        '200':
+          description: Events, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/CaseEvent'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/verifications:
+    post:
+      tags: [Cases]
+      summary: Record a verification call result
+      description: An unreachable P1 case can still be assigned (BR11).
+      operationId: addCaseVerification
+      x-roles: [VOLUNTEER, COORDINATOR, ADMIN]
+      x-scope: 'VOLUNTEER: cases with a message they entered'
+      x-stories: [US13]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VerificationCreateRequest'}
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VerificationLog'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/merge:
+    post:
+      tags: [Cases]
+      summary: Merge this case into the main case
+      description: |
+        `caseId` is the secondary case, which moves to `MERGED`. Original messages stay viewable; the main case takes the highest priority and
+        the team on the main case is notified (BR09, BR10). AI only suggests; only a person can merge (BR02).
+      operationId: mergeCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US12]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MergeRequest'}
+      responses:
+        '200':
+          description: Main case after merging
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/unmerge:
+    post:
+      tags: [Cases]
+      summary: Undo a merge
+      description: The secondary case returns to `NEW`, and its original messages return to it.
+      operationId: unmergeCase
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US12]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VersionRequest'}
+      responses:
+        '200':
+          description: Secondary case after undoing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CaseDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /merge-suggestions/{suggestionId}/reject:
+    post:
+      tags: [Cases]
+      summary: Skip a merge suggestion
+      operationId: rejectMergeSuggestion
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US09, US12]
+      parameters:
+        - {name: suggestionId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Suggestion skipped
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MergeSuggestion'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/notify-team:
+    post:
+      tags: [Dispatch]
+      summary: Tell the team about new information
+      description: The coordinator tells the team on the case (BR10). With no team on the way, returns `409` with `errorCode` `NO_ACTIVE_ASSIGNMENT`.
+      operationId: notifyTeamOfNewInfo
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US12]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotifyTeamRequest'}
+      responses:
+        '204': {description: 'Notified'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/team-suggestions:
+    get:
+      tags: [Dispatch]
+      summary: Suggest teams for a case
+      description: |
+        Up to 3 teams, by straight-line distance, vehicle and number of active missions (BR14).
+        `distanceNote` is always present and the frontend must show it. A case with no location has no `distanceKm`.
+      operationId: suggestTeams
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US15]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      responses:
+        '200':
+          description: Suggestions
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamSuggestionList'}
+              examples:
+                threeTeams: {$ref: '#/components/examples/TeamSuggestionsExample'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /cases/{caseId}/assignments:
+    post:
+      tags: [Dispatch]
+      summary: Assign a team
+      description: |
+        Moves the case to `ASSIGNED`; the team has 5 minutes to accept (BR15). When two people assign at once, only one command succeeds;
+        the other gets `409` with the team and who assigned it (AC-US15).
+      operationId: assignTeam
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US15]
+      parameters:
+        - {$ref: '#/components/parameters/CaseIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignmentCreateRequest'}
+      responses:
+        '201':
+          description: Assigned
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Assignment'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '`CASE_ALREADY_ASSIGNED` or `CASE_VERSION_CONFLICT`'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/AssignmentConflictProblem'}
+              examples:
+                alreadyAssigned: {$ref: '#/components/examples/AssignmentConflictExample'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /assignments/{assignmentId}/cancel:
+    post:
+      tags: [Dispatch]
+      summary: Cancel an assignment
+      description: The assignment moves to `CANCELLED`, the case returns to `TRIAGED` and the team is notified. A reason is required.
+      operationId: cancelAssignment
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US15]
+      parameters:
+        - {$ref: '#/components/parameters/AssignmentIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignmentCancelRequest'}
+      responses:
+        '200':
+          description: Assignment cancelled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Assignment'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: List alerts
+      operationId: listAlerts
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US16]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdQueryRequired'}
+        - {name: acknowledged, in: query, schema: {type: boolean, default: false}}
+        - {name: type, in: query, schema: {$ref: '#/components/schemas/AlertType'}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of alerts, newest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AlertPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /alerts/{alertId}/acknowledge:
+    post:
+      tags: [Alerts]
+      summary: Acknowledge an alert
+      description: Each alert is sent once until someone acknowledges it (AC-US16).
+      operationId: acknowledgeAlert
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US16]
+      parameters:
+        - {name: alertId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Alert'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List teams
+      description: Used by the team column on the command map and SCR-52. The leader comes from the `TEAM` account of the team.
+      operationId: listTeams
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US14, US22]
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/TeamStatus'}}
+        - {name: isActive, in: query, schema: {type: boolean, default: true}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of teams
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    post:
+      tags: [Teams]
+      summary: Add a team
+      operationId: createTeam
+      x-roles: [ADMIN]
+      x-stories: [US22]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TeamCreateRequest'}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Team'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /teams/{teamId}:
+    parameters:
+      - {$ref: '#/components/parameters/TeamIdPath'}
+    get:
+      tags: [Teams]
+      summary: Team detail
+      operationId: getTeam
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US22]
+      responses:
+        '200':
+          description: Team
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Team'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    patch:
+      tags: [Teams]
+      summary: Edit a team
+      description: Teams are not deleted; set `isActive` to `false` to stop using one.
+      operationId: updateTeam
+      x-roles: [ADMIN]
+      x-stories: [US22]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TeamUpdateRequest'}
+      responses:
+        '200':
+          description: Team after editing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Team'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /missions:
+    get:
+      tags: [Missions]
+      summary: Missions of my team
+      description: |
+        Missions awaiting acceptance and in progress come first. Finished missions keep only the case code, commune and outcome,
+        with no personal data (BR20).
+      operationId: listMyMissions
+      x-roles: [TEAM]
+      x-scope: 'TEAM: their own team missions'
+      x-stories: [US17]
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [open, done, all], default: all}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of missions
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /missions/{assignmentId}:
+    get:
+      tags: [Missions]
+      summary: Mission detail
+      description: |
+        Includes original messages, location, number of people, vulnerable groups and full phone numbers, so the team can still call while offline.
+        Each call writes `VIEW_PHONE` (BR22). Once the mission ends it returns `403` (BR20).
+      operationId: getMission
+      x-roles: [TEAM]
+      x-scope: 'TEAM: their own team missions, while they run'
+      x-stories: [US17]
+      parameters:
+        - {$ref: '#/components/parameters/AssignmentIdPath'}
+      responses:
+        '200':
+          description: Mission
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionDetail'}
+              examples:
+                enRoute: {$ref: '#/components/examples/MissionDetailExample'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /missions/{assignmentId}/accept:
+    post:
+      tags: [Missions]
+      summary: Accept a mission
+      description: |
+        In V1, accepting means setting off: the assignment moves from `OFFERED` to `EN_ROUTE`, and the case to `EN_ROUTE`.
+        Past the acceptance deadline or cancelled returns `409` with `errorCode` `MISSION_NOT_OFFERED`.
+      operationId: acceptMission
+      x-roles: [TEAM]
+      x-scope: 'TEAM: their own team missions'
+      x-stories: [US17]
+      parameters:
+        - {$ref: '#/components/parameters/AssignmentIdPath'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MissionAcceptRequest'}
+      responses:
+        '200':
+          description: Accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionDetail'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /missions/{assignmentId}/decline:
+    post:
+      tags: [Missions]
+      summary: Decline a mission
+      description: A reason is required. The case returns to `TRIAGED` and the coordinator is alerted (BR15).
+      operationId: declineMission
+      x-roles: [TEAM]
+      x-scope: 'TEAM: their own team missions'
+      x-stories: [US17]
+      parameters:
+        - {$ref: '#/components/parameters/AssignmentIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MissionDeclineRequest'}
+      responses:
+        '200':
+          description: Declined
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionSummary'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /missions/{assignmentId}/updates/{clientUpdateId}:
+    put:
+      tags: [Missions]
+      summary: Send an update or report an outcome
+      description: |
+        The device generates `clientUpdateId` when the button is pressed, even offline, and resends until it gets a response.
+        The first send returns `201`; resends return `200` and create no new record (BR18).
+
+        `CANNOT_REACH` returns the case to `TRIAGED` and raises an alert; the other three outcomes move it to `RESOLVED`.
+        If the assignment ended before the update arrived, the server still saves it but changes no status (`applied` is `false`).
+        Coordinators updating on behalf of a team use this same operation; the timeline records who entered it.
+      operationId: submitMissionUpdate
+      x-roles: [TEAM, COORDINATOR, ADMIN]
+      x-scope: 'TEAM: their own team missions'
+      x-stories: [US18]
+      parameters:
+        - {$ref: '#/components/parameters/AssignmentIdPath'}
+        - {name: clientUpdateId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MissionUpdateRequest'}
+            examples:
+              rescued: {$ref: '#/components/examples/MissionOutcomeExample'}
+      responses:
+        '201':
+          description: First receipt of the update
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionUpdateReceipt'}
+              examples:
+                applied: {$ref: '#/components/examples/MissionUpdateReceiptExample'}
+        '200':
+          description: Already received; no new record
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MissionUpdateReceipt'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /analytics/events/{eventId}/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Event dashboard
+      description: Figures for SCR-40. Stuck cases are overdue cases, cases with under 5 minutes left and cases whose team has gone silent.
+      operationId: getEventDashboard
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US19]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      responses:
+        '200':
+          description: Dashboard figures
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EventDashboard'}
+              examples:
+                drill: {$ref: '#/components/examples/DashboardExample'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /analytics/events/{eventId}/after-action:
+    get:
+      tags: [Analytics]
+      summary: After-action report
+      operationId: getAfterActionReport
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US19]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      responses:
+        '200':
+          description: Report (SCR-41)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AfterActionReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /analytics/events/{eventId}/after-action/lessons:
+    put:
+      tags: [Analytics]
+      summary: Save lessons learned
+      operationId: saveLessonsLearned
+      x-roles: [COORDINATOR, ADMIN]
+      x-stories: [US19]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LessonsLearnedRequest'}
+      responses:
+        '204': {description: Saved}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /analytics/events/{eventId}/ai-quality:
+    get:
+      tags: [Analytics]
+      summary: AI quality
+      description: Compares AI values with final human values, on cases a person has finalised (AC-US20).
+      operationId: getAiQuality
+      x-roles: [ADMIN]
+      x-stories: [US20]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+      responses:
+        '200':
+          description: SCR-53 figures
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiQuality'}
+              examples:
+                drill: {$ref: '#/components/examples/AiQualityExample'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /analytics/events/{eventId}/export:
+    get:
+      tags: [Analytics]
+      summary: Export Excel
+      description: Excludes phone numbers by default. Each export writes `EXPORT` to the audit log (BR22, AC-US19).
+      operationId: exportEventData
+      x-roles: [ADMIN]
+      x-stories: [US19, US24]
+      parameters:
+        - {$ref: '#/components/parameters/EventIdPath'}
+        - {name: includePhones, in: query, schema: {type: boolean, default: false}}
+      responses:
+        '200':
+          description: Excel file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List accounts
+      operationId: listUsers
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      parameters:
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/UserRole'}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/UserStatus'}}
+        - {name: q, in: query, schema: {type: string}, description: Search by name or email}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of accounts
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    post:
+      tags: [Users]
+      summary: Invite someone
+      description: |
+        Creates an `INVITED` account and a single-use invitation link valid for 7 days. The `TEAM` role requires `teamId`.
+        V1 has no email service: `inviteUrl` is returned once for the administrator to send themselves.
+      operationId: inviteUser
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserInviteRequest'}
+      responses:
+        '201':
+          description: Invitation created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserInviteResponse'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /users/{userId}:
+    parameters:
+      - {$ref: '#/components/parameters/UserIdPath'}
+    get:
+      tags: [Users]
+      summary: Account detail
+      operationId: getUser
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      responses:
+        '200':
+          description: Account
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+    patch:
+      tags: [Users]
+      summary: Edit an account
+      operationId: updateUser
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UserUpdateRequest'}
+      responses:
+        '200':
+          description: Account after editing
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /users/{userId}/disable:
+    post:
+      tags: [Users]
+      summary: Disable an account
+      description: Takes effect on the next request, because the server checks account status on every request (AC-US21).
+      operationId: disableUser
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      parameters:
+        - {$ref: '#/components/parameters/UserIdPath'}
+      responses:
+        '200':
+          description: Account disabled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /users/{userId}/enable:
+    post:
+      tags: [Users]
+      summary: Re-enable an account
+      operationId: enableUser
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      parameters:
+        - {$ref: '#/components/parameters/UserIdPath'}
+      responses:
+        '200':
+          description: Account re-enabled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/InternalError'}
+  /users/{userId}/invitation:
+    post:
+      tags: [Users]
+      summary: Recreate the invitation link
+      description: The old link stops working. Only for `INVITED` accounts.
+      operationId: resendInvitation
+      x-roles: [ADMIN]
+      x-stories: [US21]
+      parameters:
+        - {$ref: '#/components/parameters/UserIdPath'}
+      responses:
+        '201':
+          description: New link
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvitationLink'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: Audit log
+      description: The anonymisation deadline comes from `listEvents`.
+      operationId: listAuditLogs
+      x-roles: [ADMIN]
+      x-stories: [US24]
+      parameters:
+        - {name: actorId, in: query, schema: {type: string, format: uuid}}
+        - {name: action, in: query, schema: {type: string}, description: 'For example VIEW_PHONE, EXPORT, LOGIN_FAILED'}
+        - {name: entityType, in: query, schema: {type: string}}
+        - {name: entityId, in: query, schema: {type: string, format: uuid}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses:
+        '200':
+          description: A page of the audit log, newest first
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuditLogPage'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /webhooks/zalo-oa:
+    post:
+      tags: [Webhooks]
+      summary: Receive a Zalo OA message
+      description: |
+        Creates a message with channel `ZALO_OA` and replies with a tracking code through the bot. A wrong signature is rejected (AC-US06).
+        Saves the message and returns at once; everything else runs in the background. In the Could group, done last.
+      operationId: receiveZaloMessage
+      security:
+        - zaloSignature: []
+      x-roles: [ZALO_OA]
+      x-stories: [US06]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ZaloWebhookEvent'}
+      responses:
+        '200': {description: Received}
+        '401':
+          description: '`ZALO_SIGNATURE_INVALID`'
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemDetails'}
+        '500': {$ref: '#/components/responses/InternalError'}
+
+  /health:
+    get:
+      tags: [System]
+      summary: Check the service
+      description: No personal information. `degraded` means messages are still received but the Worker or AI is slow (BR07).
+      operationId: getHealth
+      security: []
+      x-roles: [PUBLIC]
+      x-stories: []
+      responses:
+        '200':
+          description: Service running
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503':
+          description: Cannot connect to the database
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 60-minute JWT, no refresh token. A disabled account loses access on its next request.
+    zaloSignature:
+      type: apiKey
+      in: header
+      name: X-ZEvent-Signature
+      description: Signature Zalo sends with the webhook. The header name and calculation need checking against the Zalo OA documentation when registering the OA.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number, starting at 1
+      schema: {type: integer, minimum: 1, default: 1}
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    EventIdQuery:
+      name: eventId
+      in: query
+      description: Disaster event
+      schema: {type: string, format: uuid}
+    EventIdQueryRequired:
+      name: eventId
+      in: query
+      required: true
+      description: The selected disaster event
+      schema: {type: string, format: uuid}
+    EventIdPath:
+      name: eventId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    TrackingCodePath:
+      name: trackingCode
+      in: path
+      required: true
+      description: Public tracking code
+      schema: {type: string, maxLength: 12, example: SOS-7K2Q}
+    ReportIdPath:
+      name: reportId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    CaseIdPath:
+      name: caseId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AssignmentIdPath:
+      name: assignmentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    TeamIdPath:
+      name: teamId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+
+  responses:
+    ValidationError:
+      description: Invalid data sent (`VALIDATION_FAILED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+          examples:
+            missingPlace: {$ref: '#/components/examples/ValidationErrorExample'}
+    InvalidCredentials:
+      description: Wrong login details (`AUTH_INVALID_CREDENTIALS`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+          examples:
+            invalid: {$ref: '#/components/examples/InvalidCredentialsExample'}
+    Unauthorized:
+      description: Missing, wrong or expired token (`AUTH_TOKEN_INVALID`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    Forbidden:
+      description: No permission (`ACCESS_DENIED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    NotFound:
+      description: Not found (`RESOURCE_NOT_FOUND`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    Conflict:
+      description: The operation does not fit the current state (`BUSINESS_CONFLICT` or a more specific code)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    VersionConflict:
+      description: The case was changed by someone else (`CASE_VERSION_CONFLICT`) or is not in a suitable state (`CASE_STATE_INVALID`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/VersionConflictProblem'}
+          examples:
+            staleVersion: {$ref: '#/components/examples/VersionConflictExample'}
+    PriorityReasonRequired:
+      description: Priority lowered without a reason (`PRIORITY_REASON_REQUIRED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    AttachmentLimitReached:
+      description: The message already has 4 images (`ATTACHMENT_LIMIT_REACHED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    InvitationInvalid:
+      description: Invitation link wrong, expired or already used (`INVITATION_INVALID`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    FileTooLarge:
+      description: Image larger than 5 MB (`FILE_TOO_LARGE`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    UnsupportedMediaType:
+      description: File format not accepted (`UNSUPPORTED_MEDIA_TYPE`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    RateLimited:
+      description: Too many calls (`RATE_LIMITED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+    ConfirmationRequired:
+      description: An IP sent over 10 messages in 10 minutes; confirm and resend (`RATE_LIMIT_CONFIRM_REQUIRED`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/RateLimitConfirmProblem'}
+          examples:
+            needConfirm: {$ref: '#/components/examples/RateLimitConfirmExample'}
+    InternalError:
+      description: Unexpected error (`INTERNAL_SERVER_ERROR`)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemDetails'}
+
+  schemas:
+    # ---------- Errors and pagination
+    ProblemDetails:
+      type: object
+      description: Error per RFC 7807. The frontend relies on `errorCode`, not `detail`.
+      required: [title, status, errorCode, traceId]
+      properties:
+        type: {type: string, default: about:blank}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        instance: {type: string}
+        errorCode: {type: string}
+        traceId: {type: string}
+        errors:
+          type: object
+          description: Errors per field, only with `VALIDATION_FAILED`
+          additionalProperties:
+            type: array
+            items: {type: string}
+    VersionConflictProblem:
+      allOf:
+        - {$ref: '#/components/schemas/ProblemDetails'}
+        - type: object
+          properties:
+            currentVersion: {type: integer, description: 'Version currently on the server'}
+    AssignmentConflictProblem:
+      allOf:
+        - {$ref: '#/components/schemas/VersionConflictProblem'}
+        - type: object
+          properties:
+            assignedTeamName: {type: string}
+            assignedByName: {type: string}
+    RateLimitConfirmProblem:
+      allOf:
+        - {$ref: '#/components/schemas/ProblemDetails'}
+        - type: object
+          required: [confirmToken]
+          properties:
+            confirmToken: {type: string, description: 'Send back in `PublicReportRequest.confirmToken`'}
+    PageMeta:
+      type: object
+      required: [page, pageSize, totalItems, totalPages]
+      properties:
+        page: {type: integer, minimum: 1}
+        pageSize: {type: integer, minimum: 1, maximum: 100}
+        totalItems: {type: integer, minimum: 0}
+        totalPages: {type: integer, minimum: 0}
+
+    # ---------- Enums, matching docs/database/soslink.dbml
+    UserRole: {type: string, enum: [VOLUNTEER, COORDINATOR, TEAM, ADMIN]}
+    UserStatus: {type: string, enum: [INVITED, ACTIVE, DISABLED]}
+    EventStatus: {type: string, enum: [OPEN, CLOSED]}
+    ReportChannel: {type: string, enum: [PUBLIC_FORM, VOLUNTEER_PASTE, ZALO_OA]}
+    AiStatus: {type: string, enum: [PENDING, OK, FAILED, TIMEOUT]}
+    CaseStatus: {type: string, enum: [NEW, TRIAGED, ASSIGNED, EN_ROUTE, RESOLVED, INVALID, MERGED]}
+    Priority: {type: string, enum: [P1, P2, P3, P4]}
+    VerificationStatus: {type: string, enum: [UNVERIFIED, REACHED, UNREACHABLE]}
+    LocationSource: {type: string, enum: [GPS, GEOCODED, MANUAL_PIN, NONE]}
+    MergeSuggestionStatus: {type: string, enum: [PENDING, ACCEPTED, REJECTED]}
+    AssignmentStatus:
+      type: string
+      description: In V1 accepting means setting off, so `ACCEPTED` is reserved but unused.
+      enum: [OFFERED, ACCEPTED, DECLINED, TIMED_OUT, EN_ROUTE, COMPLETED, CANCELLED]
+    AssignmentOutcome: {type: string, enum: [RESCUED, HANDLED_BY_OTHERS, CANNOT_REACH, NOT_FOUND]}
+    TeamStatus: {type: string, enum: [AVAILABLE, BUSY, OFF_DUTY]}
+    VehicleType: {type: string, enum: [BOAT, CAR, ON_FOOT, OTHER]}
+    AlertType: {type: string, enum: [SLA_NOT_ASSIGNED, TEAM_NOT_ACCEPTED, TEAM_NO_UPDATE, TEAM_CANNOT_REACH, NEW_INFO_ON_ACTIVE_CASE]}
+
+    # ---------- API-only enums
+    VulnerableGroup: {type: string, enum: [ELDERLY, INFANT, CHILD, PREGNANT, INJURED, DISABLED]}
+    PublicStep:
+      type: string
+      description: |
+        `RECEIVED` maps to case `NEW`. `PROCESSING` maps to `TRIAGED`. `TEAM_ASSIGNED` maps to `ASSIGNED`, `EN_ROUTE`.
+        `CLOSED` maps to `RESOLVED`, `INVALID`.
+      enum: [RECEIVED, PROCESSING, TEAM_ASSIGNED, CLOSED]
+    DeclineReason:
+      type: string
+      description: Busy on another mission · Cannot reach this area · Vehicle broken · Other reason
+      enum: [BUSY, AREA_UNREACHABLE, VEHICLE_BROKEN, OTHER]
+    TeamUpdateKind: {type: string, enum: [EN_ROUTE, OUTCOME, NOTE]}
+
+    GeoPoint:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: {type: number, format: double, minimum: -90, maximum: 90}
+        lng: {type: number, format: double, minimum: -180, maximum: 180}
+
+    # ---------- Public
+    FormStatus:
+      type: object
+      required: [accepting, hotline, events]
+      properties:
+        accepting: {type: boolean}
+        hotline: {type: string, example: '112'}
+        events:
+          type: array
+          items: {$ref: '#/components/schemas/OpenEvent'}
+    OpenEvent:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        areaDescription: {type: string}
+    PublicReportRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey]
+      anyOf:
+        - required: [gps]
+        - required: [placeText]
+      properties:
+        idempotencyKey: {type: string, format: uuid, description: 'Generated by the sender device'}
+        eventId: {type: string, format: uuid, description: 'Empty when only one event is open; required when several are open'}
+        gps: {$ref: '#/components/schemas/GeoPoint'}
+        placeText: {type: string, maxLength: 500}
+        situationText: {type: string, maxLength: 2000}
+        peopleCount: {type: integer, minimum: 1, description: 'The value 5 means 5 or more people'}
+        vulnerable:
+          type: array
+          items: {$ref: '#/components/schemas/VulnerableGroup'}
+        phone: {type: string, maxLength: 20}
+        confirmToken: {type: string, description: 'Taken from the `RATE_LIMIT_CONFIRM_REQUIRED` error'}
+    PublicReportCreated:
+      type: object
+      additionalProperties: false
+      required: [trackingCode, receivedAt, currentStep, hotline]
+      properties:
+        trackingCode: {type: string}
+        receivedAt: {type: string, format: date-time}
+        currentStep: {$ref: '#/components/schemas/PublicStep'}
+        hotline: {type: string}
+    TrackResponse:
+      type: object
+      description: Other fields are deliberately forbidden so no personal data leaks (BR19).
+      additionalProperties: false
+      required: [trackingCode, currentStep, steps, hotline]
+      properties:
+        trackingCode: {type: string}
+        currentStep: {$ref: '#/components/schemas/PublicStep'}
+        steps:
+          type: array
+          items: {$ref: '#/components/schemas/TrackStep'}
+        hotline: {type: string}
+    TrackStep:
+      type: object
+      additionalProperties: false
+      required: [step]
+      properties:
+        step: {$ref: '#/components/schemas/PublicStep'}
+        reachedAt: {type: string, format: date-time, description: 'Absent means this step is not reached yet'}
+    AttachmentRef:
+      type: object
+      required: [id, mimeType, sizeBytes, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        mimeType: {type: string}
+        sizeBytes: {type: integer, maximum: 5242880}
+        createdAt: {type: string, format: date-time}
+
+    # ---------- Auth and profile
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, format: password}
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: {type: string}
+        tokenType: {type: string, enum: [Bearer]}
+        expiresIn: {type: integer, description: Seconds, example: 3600}
+        user: {$ref: '#/components/schemas/UserProfile'}
+    UserProfile:
+      type: object
+      required: [id, email, role]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        fullName: {type: string}
+        phone: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        teamId: {type: string, format: uuid}
+        teamName: {type: string}
+    ProfileUpdateRequest:
+      type: object
+      description: There is no role field (AC-US02).
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 120}
+        phone: {type: string, maxLength: 20}
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: {type: string, format: password}
+        newPassword: {type: string, format: password, minLength: 8}
+    InvitationTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token: {type: string}
+    InvitationInfo:
+      type: object
+      required: [email, role, expiresAt]
+      properties:
+        email: {type: string, format: email}
+        role: {$ref: '#/components/schemas/UserRole'}
+        teamName: {type: string}
+        expiresAt: {type: string, format: date-time}
+    InvitationAcceptRequest:
+      type: object
+      required: [token, fullName, password]
+      properties:
+        token: {type: string}
+        fullName: {type: string, minLength: 1, maxLength: 120}
+        password: {type: string, format: password, minLength: 8}
+
+    # ---------- Events and configuration
+    Event:
+      type: object
+      required: [id, name, status, slaP1Minutes, slaP2Minutes, slaP3Minutes, teamAcceptMinutes, teamUpdateMinutes, openedAt, reportCount, caseCount]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        areaDescription: {type: string}
+        status: {$ref: '#/components/schemas/EventStatus'}
+        slaP1Minutes: {type: integer, minimum: 1, example: 10}
+        slaP2Minutes: {type: integer, minimum: 1, example: 30}
+        slaP3Minutes: {type: integer, minimum: 1, example: 120}
+        teamAcceptMinutes: {type: integer, minimum: 1, example: 5}
+        teamUpdateMinutes: {type: integer, minimum: 1, example: 30}
+        openedAt: {type: string, format: date-time}
+        closedAt: {type: string, format: date-time}
+        anonymizeDueAt: {type: string, format: date-time, description: '`closedAt` plus 90 days'}
+        anonymizedAt: {type: string, format: date-time}
+        reportCount: {type: integer, minimum: 0}
+        caseCount: {type: integer, minimum: 0}
+    EventCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        areaDescription: {type: string}
+    EventUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        areaDescription: {type: string}
+        slaP1Minutes: {type: integer, minimum: 1}
+        slaP2Minutes: {type: integer, minimum: 1}
+        slaP3Minutes: {type: integer, minimum: 1}
+        teamAcceptMinutes: {type: integer, minimum: 1}
+        teamUpdateMinutes: {type: integer, minimum: 1}
+    EventOverview:
+      type: object
+      required: [eventId, p1Unassigned, pendingReview, noLocation, openAlerts, generatedAt]
+      properties:
+        eventId: {type: string, format: uuid}
+        p1Unassigned: {type: integer, minimum: 0}
+        pendingReview: {type: integer, minimum: 0}
+        noLocation: {type: integer, minimum: 0}
+        openAlerts: {type: integer, minimum: 0}
+        generatedAt: {type: string, format: date-time}
+    DangerKeyword:
+      type: object
+      required: [id, keyword, minimumPriority, isActive]
+      properties:
+        id: {type: string, format: uuid}
+        keyword: {type: string}
+        minimumPriority: {$ref: '#/components/schemas/Priority'}
+        isActive: {type: boolean}
+    DangerKeywordCreateRequest:
+      type: object
+      required: [keyword]
+      properties:
+        keyword: {type: string, minLength: 1, maxLength: 80}
+        minimumPriority:
+          allOf:
+            - {$ref: '#/components/schemas/Priority'}
+          default: P1
+    AdminUnit:
+      type: object
+      required: [id, code, name, level]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        level: {type: string, enum: [PROVINCE, COMMUNE]}
+        parentId: {type: string, format: uuid}
+
+    # ---------- Original messages
+    ReportCreateForm:
+      type: object
+      required: [eventId, idempotencyKey]
+      properties:
+        eventId: {type: string, format: uuid}
+        idempotencyKey: {type: string, format: uuid}
+        text: {type: string, description: 'Post content, stored verbatim'}
+        sourceUrl: {type: string, format: uri, description: 'Link to the original post'}
+        photos:
+          type: array
+          maxItems: 4
+          items: {type: string, format: binary}
+    ReportSummary:
+      type: object
+      description: A row at SCR-10, SCR-11. Case fields exist only once the message belongs to a case.
+      required: [id, eventId, channel, sourceLabel, receivedAt, aiStatus]
+      properties:
+        id: {type: string, format: uuid}
+        eventId: {type: string, format: uuid}
+        channel: {$ref: '#/components/schemas/ReportChannel'}
+        sourceLabel: {type: string, description: 'Derived from the channel and the domain of `sourceUrl`, for example Form, Zalo OA, Facebook, Dán tin'}
+        textPreview: {type: string, maxLength: 200}
+        receivedAt: {type: string, format: date-time}
+        aiStatus: {$ref: '#/components/schemas/AiStatus'}
+        isRescueRequest: {type: boolean, description: '`false` shows the label for may not be a call for help'}
+        caseId: {type: string, format: uuid}
+        caseCode: {type: string}
+        caseStatus: {$ref: '#/components/schemas/CaseStatus'}
+        casePriority: {$ref: '#/components/schemas/Priority'}
+        needsHumanRead: {type: boolean}
+        verification: {$ref: '#/components/schemas/VerificationStatus'}
+        myVerificationNote: {type: string, description: 'Note the viewer entered during a verification call'}
+        submittedByName: {type: string}
+    ReportDetail:
+      type: object
+      description: Original message. `rawText` is shown verbatim (BR05), so it may contain phone numbers the sender wrote.
+      required: [id, channel, sourceLabel, receivedAt, aiStatus, attachments]
+      properties:
+        id: {type: string, format: uuid}
+        channel: {$ref: '#/components/schemas/ReportChannel'}
+        sourceLabel: {type: string}
+        sourceUrl: {type: string, format: uri}
+        rawText: {type: string}
+        contactPhoneMasked: {type: string, example: 09xxxxx234}
+        gps: {$ref: '#/components/schemas/GeoPoint'}
+        formPeopleCount: {type: integer}
+        formVulnerable:
+          type: array
+          items: {$ref: '#/components/schemas/VulnerableGroup'}
+        attachments:
+          type: array
+          items: {$ref: '#/components/schemas/AttachmentRef'}
+        aiStatus: {$ref: '#/components/schemas/AiStatus'}
+        submittedByName: {type: string}
+        receivedAt: {type: string, format: date-time}
+
+    # ---------- AI
+    AiOutput:
+      type: object
+      description: Fixed schema of the AI output, see 02-scope.md section 5. Fields the AI is unsure about are `null`.
+      properties:
+        isRescueRequest: {type: boolean, nullable: true}
+        address:
+          type: object
+          nullable: true
+          properties:
+            raw: {type: string, nullable: true}
+            commune: {type: string, nullable: true}
+            landmark: {type: string, nullable: true}
+        phones:
+          type: array
+          items: {type: string}
+        peopleCount: {type: integer, nullable: true}
+        vulnerable:
+          type: array
+          items: {$ref: '#/components/schemas/VulnerableGroup'}
+        situation: {type: string, nullable: true}
+        needs:
+          type: array
+          items: {type: string}
+        dangerSignals:
+          type: array
+          items: {type: string}
+        suggestedPriority: {type: string, nullable: true, enum: [P1, P2, P3, P4, null]}
+        reason: {type: string, nullable: true}
+        possiblyOld: {type: boolean, nullable: true}
+        confidence: {type: number, nullable: true, minimum: 0, maximum: 1}
+    AiExtraction:
+      type: object
+      required: [id, status, attempt, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/AiStatus'}
+        model: {type: string, description: 'From configuration at call time'}
+        promptVersion: {type: string}
+        attempt: {type: integer, minimum: 1, maximum: 3, description: 'Up to 3 attempts'}
+        confidence: {type: number, minimum: 0, maximum: 1}
+        suggestedPriority: {$ref: '#/components/schemas/Priority'}
+        isRescueRequest: {type: boolean}
+        possiblyOld: {type: boolean}
+        latencyMs: {type: integer}
+        output: {$ref: '#/components/schemas/AiOutput'}
+        createdAt: {type: string, format: date-time}
+
+    # ---------- Cases
+    CaseSummary:
+      type: object
+      required: [id, code, eventId, status, priority, needsHumanRead, verification, locationSource, overdue, reportCount, aiStatus, createdAt, updatedAt, version]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, example: '#1042'}
+        eventId: {type: string, format: uuid}
+        status: {$ref: '#/components/schemas/CaseStatus'}
+        priority: {$ref: '#/components/schemas/Priority'}
+        summary: {type: string}
+        place: {type: string, description: 'Short place name for lists'}
+        peopleCount: {type: integer, minimum: 0}
+        needsHumanRead: {type: boolean}
+        isRescueRequest: {type: boolean}
+        possiblyOld: {type: boolean}
+        verification: {$ref: '#/components/schemas/VerificationStatus'}
+        location: {$ref: '#/components/schemas/GeoPoint'}
+        locationSource: {$ref: '#/components/schemas/LocationSource'}
+        channel: {$ref: '#/components/schemas/ReportChannel'}
+        sourceLabel: {type: string}
+        reportCount: {type: integer, minimum: 1}
+        aiStatus: {$ref: '#/components/schemas/AiStatus'}
+        slaDueAt: {type: string, format: date-time, description: 'P4 has no deadline'}
+        overdue: {type: boolean}
+        teamName: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 0, description: 'Send back when editing to prevent overwrites'}
+    CaseDetail:
+      allOf:
+        - {$ref: '#/components/schemas/CaseSummary'}
+        - type: object
+          required: [reports, mergeSuggestions, verifications, phonesMasked, vulnerable, matchedKeywords]
+          properties:
+            addressText: {type: string}
+            communeId: {type: string, format: uuid}
+            locationConfidence: {type: number, minimum: 0, maximum: 1}
+            phonesMasked:
+              type: array
+              items: {type: string}
+            vulnerable:
+              type: array
+              items: {$ref: '#/components/schemas/VulnerableGroup'}
+            needs:
+              type: array
+              items: {type: string}
+            priorityReason: {type: string}
+            matchedKeywords:
+              type: array
+              items: {type: string}
+            peopleRescued: {type: integer, minimum: 0}
+            mergedIntoId: {type: string, format: uuid}
+            invalidReason: {type: string}
+            reviewedByName: {type: string}
+            reviewedAt: {type: string, format: date-time}
+            resolvedAt: {type: string, format: date-time}
+            reports:
+              type: array
+              minItems: 1
+              items: {$ref: '#/components/schemas/ReportDetail'}
+            latestExtraction: {$ref: '#/components/schemas/AiExtraction'}
+            mergeSuggestions:
+              type: array
+              items: {$ref: '#/components/schemas/MergeSuggestion'}
+            activeAssignment: {$ref: '#/components/schemas/Assignment'}
+            verifications:
+              type: array
+              items: {$ref: '#/components/schemas/VerificationLog'}
+    CaseUpdateRequest:
+      type: object
+      description: Send only changed fields. Fields not sent stay as they are.
+      additionalProperties: false
+      required: [version]
+      minProperties: 2
+      properties:
+        version: {type: integer, minimum: 0}
+        summary: {type: string, nullable: true}
+        addressText: {type: string, nullable: true}
+        communeId: {type: string, format: uuid, nullable: true}
+        phones:
+          type: array
+          items: {type: string, maxLength: 20}
+        peopleCount: {type: integer, nullable: true, minimum: 0}
+        vulnerable:
+          type: array
+          items: {$ref: '#/components/schemas/VulnerableGroup'}
+        needs:
+          type: array
+          items: {type: string}
+        priority: {$ref: '#/components/schemas/Priority'}
+        priorityReason: {type: string, description: 'Required when lowering'}
+    VersionRequest:
+      type: object
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 0}
+    LocationPinRequest:
+      allOf:
+        - {$ref: '#/components/schemas/GeoPoint'}
+        - {$ref: '#/components/schemas/VersionRequest'}
+    CaseInvalidateRequest:
+      allOf:
+        - {$ref: '#/components/schemas/VersionRequest'}
+        - type: object
+          required: [reason]
+          properties:
+            reason: {type: string, minLength: 1}
+    CaseResolveRequest:
+      allOf:
+        - {$ref: '#/components/schemas/VersionRequest'}
+        - type: object
+          required: [note]
+          properties:
+            note: {type: string, minLength: 1}
+            peopleRescued: {type: integer, minimum: 0}
+    MergeRequest:
+      allOf:
+        - {$ref: '#/components/schemas/VersionRequest'}
+        - type: object
+          required: [intoCaseId]
+          properties:
+            intoCaseId: {type: string, format: uuid, description: Main case}
+            suggestionId: {type: string, format: uuid, description: 'The suggestion being accepted, if any'}
+    MergeSuggestion:
+      type: object
+      required: [id, caseId, candidateCaseId, candidateCaseCode, reason, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        caseId: {type: string, format: uuid}
+        candidateCaseId: {type: string, format: uuid}
+        candidateCaseCode: {type: string}
+        candidatePreview: {type: string}
+        reason: {type: string}
+        score: {type: number, minimum: 0, maximum: 1}
+        status: {$ref: '#/components/schemas/MergeSuggestionStatus'}
+        decidedByName: {type: string}
+        decidedAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    PhoneRevealRequest:
+      type: object
+      properties:
+        purpose: {type: string, description: Written to the audit log, example: Gọi xác minh}
+    PhoneRevealResponse:
+      type: object
+      required: [caseId, phones, revealedAt]
+      properties:
+        caseId: {type: string, format: uuid}
+        phones:
+          type: array
+          items: {type: string}
+        revealedAt: {type: string, format: date-time}
+    VerificationCreateRequest:
+      type: object
+      required: [result]
+      properties:
+        result: {type: string, enum: [REACHED, UNREACHABLE]}
+        note: {type: string}
+    VerificationLog:
+      type: object
+      required: [id, caseId, result, createdByName, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        caseId: {type: string, format: uuid}
+        result: {$ref: '#/components/schemas/VerificationStatus'}
+        note: {type: string}
+        createdByName: {type: string}
+        createdAt: {type: string, format: date-time}
+    CaseEvent:
+      type: object
+      required: [id, type, createdAt]
+      properties:
+        id: {type: integer, format: int64}
+        type: {type: string, example: PRIORITY_CHANGED}
+        fromValue: {description: 'Value before the change'}
+        toValue: {description: 'Value after the change'}
+        note: {type: string}
+        actorName: {type: string, description: 'Absent means the system did it'}
+        createdAt: {type: string, format: date-time}
+    NotifyTeamRequest:
+      type: object
+      properties:
+        note: {type: string}
+
+    # ---------- Assignment
+    TeamSuggestionList:
+      type: object
+      required: [caseId, distanceNote, suggestions]
+      properties:
+        caseId: {type: string, format: uuid}
+        distanceNote: {type: string}
+        suggestions:
+          type: array
+          maxItems: 3
+          items: {$ref: '#/components/schemas/TeamSuggestion'}
+    TeamSuggestion:
+      type: object
+      required: [teamId, teamName, vehicle, activeAssignments]
+      properties:
+        teamId: {type: string, format: uuid}
+        teamName: {type: string}
+        vehicle: {$ref: '#/components/schemas/VehicleType'}
+        distanceKm: {type: number, minimum: 0}
+        activeAssignments: {type: integer, minimum: 0}
+    AssignmentCreateRequest:
+      allOf:
+        - {$ref: '#/components/schemas/VersionRequest'}
+        - type: object
+          required: [teamId]
+          properties:
+            teamId: {type: string, format: uuid}
+    AssignmentCancelRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1}
+    Assignment:
+      type: object
+      required: [id, caseId, caseCode, teamId, teamName, status, assignedByName, acceptDueAt, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        caseId: {type: string, format: uuid}
+        caseCode: {type: string}
+        teamId: {type: string, format: uuid}
+        teamName: {type: string}
+        status: {$ref: '#/components/schemas/AssignmentStatus'}
+        outcome: {$ref: '#/components/schemas/AssignmentOutcome'}
+        peopleRescued: {type: integer, minimum: 0}
+        declineReason: {type: string}
+        note: {type: string}
+        assignedByName: {type: string}
+        acceptDueAt: {type: string, format: date-time}
+        acceptedAt: {type: string, format: date-time}
+        lastUpdateAt: {type: string, format: date-time}
+        completedAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+
+    # ---------- Alerts and teams
+    Alert:
+      type: object
+      required: [id, caseId, caseCode, type, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        caseId: {type: string, format: uuid}
+        caseCode: {type: string}
+        assignmentId: {type: string, format: uuid}
+        type: {$ref: '#/components/schemas/AlertType'}
+        teamName: {type: string}
+        minutes: {type: integer, description: 'Minutes overdue or silent'}
+        acknowledgedByName: {type: string}
+        acknowledgedAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    Team:
+      type: object
+      required: [id, name, phone, vehicle, status, isActive, activeAssignments, silent, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        phone: {type: string}
+        vehicle: {$ref: '#/components/schemas/VehicleType'}
+        capacity: {type: integer, minimum: 0}
+        areaDescription: {type: string}
+        status: {$ref: '#/components/schemas/TeamStatus'}
+        isActive: {type: boolean}
+        leaderName: {type: string, description: 'The `TEAM` account of the team'}
+        lastLocation: {$ref: '#/components/schemas/GeoPoint'}
+        lastSeenAt: {type: string, format: date-time}
+        activeAssignments: {type: integer, minimum: 0}
+        currentAssignment: {$ref: '#/components/schemas/TeamCurrentAssignment'}
+        silent: {type: boolean, description: 'On a case with no update past the reporting deadline'}
+        createdAt: {type: string, format: date-time}
+    TeamCurrentAssignment:
+      type: object
+      required: [assignmentId, caseCode, status]
+      properties:
+        assignmentId: {type: string, format: uuid}
+        caseCode: {type: string}
+        place: {type: string}
+        status: {$ref: '#/components/schemas/AssignmentStatus'}
+        lastUpdateAt: {type: string, format: date-time}
+    TeamCreateRequest:
+      type: object
+      required: [name, phone, vehicle]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        phone: {type: string, maxLength: 20}
+        vehicle: {$ref: '#/components/schemas/VehicleType'}
+        capacity: {type: integer, minimum: 0}
+        areaDescription: {type: string}
+        status: {$ref: '#/components/schemas/TeamStatus'}
+    TeamUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        phone: {type: string, maxLength: 20}
+        vehicle: {$ref: '#/components/schemas/VehicleType'}
+        capacity: {type: integer, minimum: 0}
+        areaDescription: {type: string}
+        status: {$ref: '#/components/schemas/TeamStatus'}
+        isActive: {type: boolean}
+        lastLocation: {$ref: '#/components/schemas/GeoPoint'}
+
+    # ---------- Missions
+    MissionSummary:
+      type: object
+      required: [assignmentId, caseCode, priority, status, teamName]
+      properties:
+        assignmentId: {type: string, format: uuid}
+        caseCode: {type: string}
+        priority: {$ref: '#/components/schemas/Priority'}
+        status: {$ref: '#/components/schemas/AssignmentStatus'}
+        teamName: {type: string}
+        peopleCount: {type: integer, minimum: 0}
+        vulnerable:
+          type: array
+          items: {$ref: '#/components/schemas/VulnerableGroup'}
+        situation: {type: string}
+        place: {type: string, description: 'Only the commune name after the mission ends'}
+        acceptDueAt: {type: string, format: date-time}
+        outcome: {$ref: '#/components/schemas/AssignmentOutcome'}
+        peopleRescued: {type: integer, minimum: 0}
+        completedAt: {type: string, format: date-time}
+    MissionDetail:
+      allOf:
+        - {$ref: '#/components/schemas/MissionSummary'}
+        - type: object
+          required: [phones, originalMessages, locationSource]
+          properties:
+            addressText: {type: string}
+            location: {$ref: '#/components/schemas/GeoPoint'}
+            locationSource: {$ref: '#/components/schemas/LocationSource'}
+            phones:
+              type: array
+              items: {type: string}
+            originalMessages:
+              type: array
+              items: {$ref: '#/components/schemas/MissionMessage'}
+    MissionMessage:
+      type: object
+      required: [reportId, receivedAt]
+      properties:
+        reportId: {type: string, format: uuid}
+        text: {type: string}
+        attachmentIds:
+          type: array
+          items: {type: string, format: uuid}
+        receivedAt: {type: string, format: date-time}
+    MissionAcceptRequest:
+      type: object
+      properties:
+        occurredAt: {type: string, format: date-time}
+        gps: {$ref: '#/components/schemas/GeoPoint'}
+    MissionDeclineRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: {$ref: '#/components/schemas/DeclineReason'}
+        note: {type: string}
+    MissionUpdateRequest:
+      type: object
+      description: '`OUTCOME` requires `outcome`; `RESCUED` requires `peopleRescued`.'
+      required: [kind, occurredAt]
+      properties:
+        kind: {$ref: '#/components/schemas/TeamUpdateKind'}
+        occurredAt: {type: string, format: date-time, description: 'Device time when the button was pressed'}
+        outcome: {$ref: '#/components/schemas/AssignmentOutcome'}
+        peopleRescued: {type: integer, minimum: 0}
+        note: {type: string}
+        gps: {$ref: '#/components/schemas/GeoPoint'}
+    MissionUpdateReceipt:
+      type: object
+      required: [clientUpdateId, assignmentId, kind, receivedAt, replayed, applied, assignmentStatus, caseStatus]
+      properties:
+        clientUpdateId: {type: string, format: uuid}
+        assignmentId: {type: string, format: uuid}
+        kind: {$ref: '#/components/schemas/TeamUpdateKind'}
+        receivedAt: {type: string, format: date-time}
+        replayed: {type: boolean, description: 'The record exists from an earlier send'}
+        applied: {type: boolean, description: '`false` when the assignment has ended; the update is still saved'}
+        assignmentStatus: {$ref: '#/components/schemas/AssignmentStatus'}
+        caseStatus: {$ref: '#/components/schemas/CaseStatus'}
+
+    # ---------- Reports
+    EventDashboard:
+      type: object
+      required: [eventId, generatedAt, totals, reportsByHour, timeToTeam, stuckCases, byStatus, byPriority]
+      properties:
+        eventId: {type: string, format: uuid}
+        generatedAt: {type: string, format: date-time}
+        totals: {$ref: '#/components/schemas/DashboardTotals'}
+        reportsByHour:
+          type: array
+          items: {$ref: '#/components/schemas/HourCount'}
+        timeToTeam:
+          type: array
+          items: {$ref: '#/components/schemas/PriorityTiming'}
+        stuckCases:
+          type: array
+          items: {$ref: '#/components/schemas/StuckCase'}
+        byStatus:
+          type: array
+          items: {$ref: '#/components/schemas/StatusCount'}
+        byPriority:
+          type: array
+          items: {$ref: '#/components/schemas/PriorityCount'}
+    DashboardTotals:
+      type: object
+      required: [reportsReceived, mergedCases, duplicateRate, realCases, invalidCases, p1Unassigned, p1Overdue, resolvedCases, peopleHelped, openCases]
+      properties:
+        reportsReceived: {type: integer, minimum: 0}
+        mergedCases: {type: integer, minimum: 0}
+        duplicateRate: {type: number, minimum: 0, maximum: 1}
+        realCases: {type: integer, minimum: 0}
+        invalidCases: {type: integer, minimum: 0}
+        p1Unassigned: {type: integer, minimum: 0}
+        p1Overdue: {type: integer, minimum: 0}
+        resolvedCases: {type: integer, minimum: 0}
+        peopleHelped: {type: integer, minimum: 0}
+        openCases: {type: integer, minimum: 0}
+    HourCount:
+      type: object
+      required: [hour, count]
+      properties:
+        hour: {type: string, format: date-time, description: Start of the hour}
+        count: {type: integer, minimum: 0}
+    PriorityTiming:
+      type: object
+      required: [priority, cases, lateCount]
+      properties:
+        priority: {$ref: '#/components/schemas/Priority'}
+        cases: {type: integer, minimum: 0}
+        medianToTeamMinutes: {type: integer, minimum: 0}
+        slaMinutes: {type: integer, minimum: 0, description: 'P4 has no deadline'}
+        lateCount: {type: integer, minimum: 0}
+        medianToResolveMinutes: {type: integer, minimum: 0}
+    StuckCase:
+      type: object
+      required: [caseId, caseCode, priority, reason, minutes]
+      properties:
+        caseId: {type: string, format: uuid}
+        caseCode: {type: string}
+        priority: {$ref: '#/components/schemas/Priority'}
+        summary: {type: string}
+        place: {type: string}
+        reason: {type: string, enum: [TEAM_SILENT, OVERDUE, DUE_SOON]}
+        minutes: {type: integer, minimum: 0, description: 'Minutes silent, overdue or remaining'}
+        teamName: {type: string}
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status: {$ref: '#/components/schemas/CaseStatus'}
+        count: {type: integer, minimum: 0}
+    PriorityCount:
+      type: object
+      required: [priority, count]
+      properties:
+        priority: {$ref: '#/components/schemas/Priority'}
+        count: {type: integer, minimum: 0}
+    AfterActionReport:
+      type: object
+      required: [eventId, eventName, totals, byPriority, unreachedCases]
+      properties:
+        eventId: {type: string, format: uuid}
+        eventName: {type: string}
+        closedAt: {type: string, format: date-time}
+        totals:
+          type: object
+          required: [reportsReceived, duplicateReports, duplicateRate, realCases, invalidCases, resolvedCases, unreachedCases, peopleHelped, peopleHelpedP1, lateAssignments]
+          properties:
+            reportsReceived: {type: integer, minimum: 0}
+            duplicateReports: {type: integer, minimum: 0}
+            duplicateRate: {type: number, minimum: 0, maximum: 1}
+            realCases: {type: integer, minimum: 0}
+            invalidCases: {type: integer, minimum: 0}
+            resolvedCases: {type: integer, minimum: 0}
+            unreachedCases: {type: integer, minimum: 0}
+            peopleHelped: {type: integer, minimum: 0}
+            peopleHelpedP1: {type: integer, minimum: 0}
+            lateAssignments: {type: integer, minimum: 0}
+        byPriority:
+          type: array
+          items: {$ref: '#/components/schemas/PriorityTiming'}
+        unreachedCases:
+          type: array
+          items: {$ref: '#/components/schemas/UnreachedCase'}
+        lessonsLearned: {type: string}
+    UnreachedCase:
+      type: object
+      required: [caseCode, priority, outcome]
+      properties:
+        caseCode: {type: string}
+        priority: {$ref: '#/components/schemas/Priority'}
+        place: {type: string}
+        outcome: {$ref: '#/components/schemas/AssignmentOutcome'}
+        note: {type: string}
+    LessonsLearnedRequest:
+      type: object
+      required: [lessonsLearned]
+      properties:
+        lessonsLearned: {type: string}
+    AiQuality:
+      type: object
+      required: [eventId, reviewedCases, p1Recall, priorityRaised, priorityLowered, mergeSuggestions, latency, cost, fields, priorityMatrix, raisedCases]
+      properties:
+        eventId: {type: string, format: uuid}
+        reviewedCases: {type: integer, minimum: 0}
+        p1Recall:
+          type: object
+          required: [caught, total]
+          properties:
+            caught: {type: integer, minimum: 0}
+            total: {type: integer, minimum: 0}
+        priorityRaised: {type: integer, minimum: 0}
+        priorityLowered: {type: integer, minimum: 0}
+        mergeSuggestions:
+          type: object
+          required: [accepted, total, pending]
+          properties:
+            accepted: {type: integer, minimum: 0}
+            total: {type: integer, minimum: 0}
+            pending: {type: integer, minimum: 0}
+        latency:
+          type: object
+          required: [averageMs, maxMs, failures]
+          properties:
+            averageMs: {type: integer, minimum: 0}
+            maxMs: {type: integer, minimum: 0}
+            failures: {type: integer, minimum: 0}
+        cost:
+          type: object
+          required: [usd, cases]
+          properties:
+            usd: {type: number, minimum: 0}
+            cases: {type: integer, minimum: 0}
+        fields:
+          type: array
+          items: {$ref: '#/components/schemas/AiFieldAccuracy'}
+        priorityMatrix:
+          type: array
+          items: {$ref: '#/components/schemas/AiPriorityRow'}
+        raisedCases:
+          type: array
+          items: {$ref: '#/components/schemas/AiRaisedCase'}
+    AiFieldAccuracy:
+      type: object
+      required: [field, correct, graded, rate]
+      properties:
+        field: {type: string}
+        correct: {type: integer, minimum: 0}
+        graded: {type: integer, minimum: 0}
+        rate: {type: number, minimum: 0, maximum: 1}
+    AiPriorityRow:
+      type: object
+      required: [aiPriority, finalP1, finalP2, finalP3, finalP4]
+      properties:
+        aiPriority: {$ref: '#/components/schemas/Priority'}
+        finalP1: {type: integer, minimum: 0}
+        finalP2: {type: integer, minimum: 0}
+        finalP3: {type: integer, minimum: 0}
+        finalP4: {type: integer, minimum: 0}
+    AiRaisedCase:
+      type: object
+      required: [caseId, caseCode, aiPriority, finalPriority]
+      properties:
+        caseId: {type: string, format: uuid}
+        caseCode: {type: string}
+        aiPriority: {$ref: '#/components/schemas/Priority'}
+        finalPriority: {$ref: '#/components/schemas/Priority'}
+        reason: {type: string}
+        correctedByName: {type: string}
+
+    # ---------- Accounts, audit log, system
+    User:
+      type: object
+      required: [id, email, role, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        fullName: {type: string, description: 'Absent until activated'}
+        phone: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        status: {$ref: '#/components/schemas/UserStatus'}
+        teamId: {type: string, format: uuid}
+        teamName: {type: string}
+        lastLoginAt: {type: string, format: date-time}
+        invitationExpiresAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    UserInviteRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email: {type: string, format: email}
+        role: {$ref: '#/components/schemas/UserRole'}
+        teamId: {type: string, format: uuid, description: 'Required when the role is `TEAM`'}
+    UserInviteResponse:
+      type: object
+      required: [user, inviteUrl, expiresAt]
+      properties:
+        user: {$ref: '#/components/schemas/User'}
+        inviteUrl: {type: string, format: uri}
+        expiresAt: {type: string, format: date-time}
+    InvitationLink:
+      type: object
+      required: [inviteUrl, expiresAt]
+      properties:
+        inviteUrl: {type: string, format: uri}
+        expiresAt: {type: string, format: date-time}
+    UserUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: {type: string, minLength: 1, maxLength: 120}
+        phone: {type: string, maxLength: 20}
+        role: {$ref: '#/components/schemas/UserRole'}
+        teamId: {type: string, format: uuid, nullable: true}
+    AuditLog:
+      type: object
+      required: [id, action, entityType, createdAt]
+      properties:
+        id: {type: integer, format: int64}
+        actorId: {type: string, format: uuid}
+        actorName: {type: string}
+        action: {type: string, example: VIEW_PHONE}
+        entityType: {type: string, example: case}
+        entityId: {type: string, format: uuid}
+        entityLabel: {type: string, example: '#1046'}
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt: {type: string, format: date-time}
+    ZaloWebhookEvent:
+      type: object
+      description: Content is defined by Zalo; only the fields the system reads are listed.
+      additionalProperties: true
+      required: [event_name]
+      properties:
+        event_name: {type: string}
+        timestamp: {type: string}
+    Health:
+      type: object
+      required: [status, database, checkedAt]
+      properties:
+        status: {type: string, enum: [ok, degraded, down]}
+        database: {type: string, enum: [ok, down]}
+        pendingAiReports: {type: integer, minimum: 0}
+        lastWorkerRunAt: {type: string, format: date-time}
+        checkedAt: {type: string, format: date-time}
+
+    # ---------- Result pages
+    EventPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Event'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    AdminUnitPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/AdminUnit'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    ReportPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ReportSummary'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    CasePage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CaseSummary'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    AlertPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Alert'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    TeamPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Team'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    MissionPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/MissionSummary'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    UserPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/User'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+    AuditLogPage:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/AuditLog'}
+        meta: {$ref: '#/components/schemas/PageMeta'}
+
+  examples:
+    ValidationErrorExample:
+      summary: Missing location and place
+      value:
+        title: Dữ liệu không hợp lệ
+        status: 400
+        errorCode: VALIDATION_FAILED
+        detail: Cho biết vị trí hoặc tả nơi ở để gửi được.
+        traceId: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+        errors:
+          placeText: [Cần có vị trí GPS hoặc mô tả nơi ở.]
+    InvalidCredentialsExample:
+      summary: Generic message, does not reveal the account
+      value:
+        title: Đăng nhập thất bại
+        status: 401
+        errorCode: AUTH_INVALID_CREDENTIALS
+        detail: Email hoặc mật khẩu không đúng.
+        traceId: 00-5af92f3577b34da6a3ce929d0e0e4737-00f067aa0ba902b8-01
+    VersionConflictExample:
+      summary: Someone else just edited the case
+      value:
+        title: Ca đã thay đổi
+        status: 409
+        errorCode: CASE_VERSION_CONFLICT
+        detail: Ca này vừa được người khác sửa. Tải lại để xem.
+        traceId: 00-6cf92f3577b34da6a3ce929d0e0e4738-00f067aa0ba902b9-01
+        currentVersion: 4
+    AssignmentConflictExample:
+      summary: Two people assign at once
+      value:
+        title: Ca đã được phân công
+        status: 409
+        errorCode: CASE_ALREADY_ASSIGNED
+        detail: Ca này vừa được Sơn phân công cho Đội 5.
+        traceId: 00-7df92f3577b34da6a3ce929d0e0e4739-00f067aa0ba902ba-01
+        currentVersion: 5
+        assignedTeamName: Đội 5
+        assignedByName: Sơn
+    RateLimitConfirmExample:
+      summary: Confirmation needed, content stays on the sender device
+      value:
+        title: Cần xác nhận
+        status: 429
+        errorCode: RATE_LIMIT_CONFIRM_REQUIRED
+        detail: Bạn vừa gửi nhiều tin. Xác nhận đây là tin thật để gửi tiếp.
+        traceId: 00-8ef92f3577b34da6a3ce929d0e0e473a-00f067aa0ba902bb-01
+        confirmToken: cf_01J9ZQ7K2Q
+    FormStatusExample:
+      summary: One event is open
+      value:
+        accepting: true
+        hotline: '112'
+        events:
+          - id: 7b1e2c44-5a10-4c7e-9a31-2f6d8e0a1b01
+            name: Diễn tập lũ sông Ba, 11/2026
+            areaDescription: Tây Hòa, Đông Hòa, Tuy An
+    PublicReportRequestExample:
+      summary: With GPS, number of people and vulnerable groups
+      value:
+        idempotencyKey: 6f0a4c1e-2b7d-4e9a-8c11-5d3e7a9b0c21
+        gps: {lat: 13.0, lng: 109.215}
+        placeText: Gần cầu Sông Ba, thôn 3, Hòa Thịnh
+        situationText: nước lên tới mái nhà
+        peopleCount: 3
+        vulnerable: [ELDERLY, INFANT]
+        phone: 09xxxxx234
+    PublicReportCreatedExample:
+      summary: Message received
+      value:
+        trackingCode: SOS-7K2Q
+        receivedAt: '2026-11-03T05:40:00Z'
+        currentStep: RECEIVED
+        hotline: '112'
+    TrackExample:
+      summary: Team assigned
+      value:
+        trackingCode: SOS-7K2Q
+        currentStep: TEAM_ASSIGNED
+        hotline: '112'
+        steps:
+          - {step: RECEIVED, reachedAt: '2026-11-03T05:40:00Z'}
+          - {step: PROCESSING, reachedAt: '2026-11-03T05:48:00Z'}
+          - {step: TEAM_ASSIGNED, reachedAt: '2026-11-03T06:02:00Z'}
+          - {step: CLOSED}
+    LoginRequestExample:
+      summary: Coordinator
+      value:
+        email: lan@example.vn
+        password: VidoMatKhau123
+    LoginSuccessExample:
+      summary: Coordinator logs in
+      value:
+        accessToken: eyJhbGciOiJIUzI1NiJ9.vi-du.chu-ky
+        tokenType: Bearer
+        expiresIn: 3600
+        user:
+          id: e0000001-0000-4000-8000-000000000001
+          email: lan@example.vn
+          fullName: Nguyễn Thị Lan
+          phone: 09xxxxx452
+          role: COORDINATOR
+    CaseListExample:
+      summary: Top of the queue
+      value:
+        items:
+          - id: c1042000-0000-4000-8000-000000001042
+            code: '#1042'
+            eventId: 7b1e2c44-5a10-4c7e-9a31-2f6d8e0a1b01
+            status: NEW
+            priority: P1
+            summary: Trên mái nhà, có trẻ 8 tháng
+            place: Thôn 3, Hòa Thịnh
+            peopleCount: 3
+            needsHumanRead: false
+            verification: UNVERIFIED
+            location: {lat: 13.0, lng: 109.215}
+            locationSource: GEOCODED
+            channel: VOLUNTEER_PASTE
+            sourceLabel: Facebook
+            reportCount: 1
+            aiStatus: OK
+            slaDueAt: '2026-11-03T07:12:00Z'
+            overdue: true
+            createdAt: '2026-11-03T07:02:00Z'
+            updatedAt: '2026-11-03T07:02:06Z'
+            version: 3
+        meta: {page: 1, pageSize: 20, totalItems: 12, totalPages: 1}
+    CaseDetailExample:
+      summary: P1 case awaiting review, with two merge suggestions
+      value:
+        id: c1042000-0000-4000-8000-000000001042
+        code: '#1042'
+        eventId: 7b1e2c44-5a10-4c7e-9a31-2f6d8e0a1b01
+        status: NEW
+        priority: P1
+        summary: Trên mái nhà, có trẻ 8 tháng
+        place: Thôn 3, Hòa Thịnh
+        peopleCount: 3
+        needsHumanRead: false
+        isRescueRequest: true
+        possiblyOld: false
+        verification: UNVERIFIED
+        location: {lat: 13.0, lng: 109.215}
+        locationSource: GEOCODED
+        locationConfidence: 0.6
+        channel: VOLUNTEER_PASTE
+        sourceLabel: Facebook
+        reportCount: 1
+        aiStatus: OK
+        slaDueAt: '2026-11-03T07:12:00Z'
+        overdue: true
+        createdAt: '2026-11-03T07:02:00Z'
+        updatedAt: '2026-11-03T07:02:06Z'
+        version: 3
+        addressText: Gần cầu Sông Ba, thôn 3, Hòa Thịnh
+        phonesMasked: [09xxxxx234]
+        vulnerable: [ELDERLY, INFANT]
+        needs: [RESCUE]
+        priorityReason: Nước tới mái, có trẻ 8 tháng và 2 người già
+        matchedKeywords: [mái, 8 tháng]
+        reports:
+          - id: a1042000-0000-4000-8000-000000000001
+            channel: VOLUNTEER_PASTE
+            sourceLabel: Facebook
+            rawText: cứu vs ạ, nhà e ở gần cầu Sông Ba thôn 3 hòa thịnh, nc lên tới mái r, có 2 cụ già vs bé 8 tháng
+            attachments: []
+            aiStatus: OK
+            submittedByName: Lan
+            receivedAt: '2026-11-03T07:02:00Z'
+        latestExtraction:
+          id: 9a104200-0000-4000-8000-000000000001
+          status: OK
+          model: lay-tu-cau-hinh
+          promptVersion: v1
+          attempt: 1
+          confidence: 0.86
+          suggestedPriority: P1
+          isRescueRequest: true
+          possiblyOld: false
+          latencyMs: 4000
+          createdAt: '2026-11-03T07:02:06Z'
+        mergeSuggestions:
+          - id: 8b104200-0000-4000-8000-000000000001
+            caseId: c1042000-0000-4000-8000-000000001042
+            candidateCaseId: c1038000-0000-4000-8000-000000001038
+            candidateCaseCode: '#1038'
+            reason: Trùng số điện thoại
+            status: PENDING
+            createdAt: '2026-11-03T07:02:07Z'
+          - id: 8b104200-0000-4000-8000-000000000002
+            caseId: c1042000-0000-4000-8000-000000001042
+            candidateCaseId: c1041000-0000-4000-8000-000000001041
+            candidateCaseCode: '#1041'
+            reason: Cách 150 m, nội dung gần giống
+            score: 0.72
+            status: PENDING
+            createdAt: '2026-11-03T07:02:07Z'
+        verifications: []
+    CaseUpdateExample:
+      summary: Edit people and raise the level
+      value:
+        version: 3
+        peopleCount: 4
+        priority: P1
+    TeamSuggestionsExample:
+      summary: Three free teams
+      value:
+        caseId: c1045000-0000-4000-8000-000000001045
+        distanceNote: Khoảng cách tính theo đường chim bay, chưa tính đường ngập. Nên hỏi lại đội trước khi chốt.
+        suggestions:
+          - {teamId: d0000004-0000-4000-8000-000000000004, teamName: Đội 4, vehicle: ON_FOOT, distanceKm: 3.1, activeAssignments: 0}
+          - {teamId: d0000005-0000-4000-8000-000000000005, teamName: Đội 5, vehicle: BOAT, distanceKm: 7.4, activeAssignments: 0}
+          - {teamId: d0000001-0000-4000-8000-000000000001, teamName: Đội 1, vehicle: BOAT, distanceKm: 8.6, activeAssignments: 0}
+    MissionDetailExample:
+      summary: Team on the way
+      value:
+        assignmentId: b1042000-0000-4000-8000-000000000001
+        caseCode: '#1042'
+        priority: P1
+        status: EN_ROUTE
+        teamName: Đội 1
+        peopleCount: 3
+        vulnerable: [ELDERLY, INFANT]
+        situation: Nước ngập tới mái nhà
+        place: Hòa Thịnh
+        addressText: Gần cầu Sông Ba, thôn 3, Hòa Thịnh
+        location: {lat: 13.0, lng: 109.215}
+        locationSource: GEOCODED
+        phones: [09xxxxx234]
+        originalMessages:
+          - reportId: a1042000-0000-4000-8000-000000000001
+            text: cứu vs ạ, nhà e ở gần cầu Sông Ba thôn 3 hòa thịnh, nc lên tới mái r, có 2 cụ già vs bé 8 tháng
+            receivedAt: '2026-11-03T07:02:00Z'
+    MissionOutcomeExample:
+      summary: 3 people rescued, resent once online
+      value:
+        kind: OUTCOME
+        occurredAt: '2026-11-03T07:58:00Z'
+        outcome: RESCUED
+        peopleRescued: 3
+    MissionUpdateReceiptExample:
+      summary: Case moved to resolved
+      value:
+        clientUpdateId: f0000001-0000-4000-8000-000000000001
+        assignmentId: b1042000-0000-4000-8000-000000000001
+        kind: OUTCOME
+        receivedAt: '2026-11-03T08:06:00Z'
+        replayed: false
+        applied: true
+        assignmentStatus: COMPLETED
+        caseStatus: RESOLVED
+    DashboardExample:
+      summary: Drill event at 14:16
+      value:
+        eventId: 7b1e2c44-5a10-4c7e-9a31-2f6d8e0a1b01
+        generatedAt: '2026-11-03T07:16:00Z'
+        totals:
+          reportsReceived: 34
+          mergedCases: 1
+          duplicateRate: 0.03
+          realCases: 26
+          invalidCases: 2
+          p1Unassigned: 3
+          p1Overdue: 1
+          resolvedCases: 12
+          peopleHelped: 46
+          openCases: 14
+        reportsByHour:
+          - {hour: '2026-11-03T00:00:00Z', count: 5}
+          - {hour: '2026-11-03T01:00:00Z', count: 4}
+          - {hour: '2026-11-03T02:00:00Z', count: 2}
+          - {hour: '2026-11-03T03:00:00Z', count: 4}
+          - {hour: '2026-11-03T04:00:00Z', count: 1}
+          - {hour: '2026-11-03T05:00:00Z', count: 2}
+          - {hour: '2026-11-03T06:00:00Z', count: 9}
+          - {hour: '2026-11-03T07:00:00Z', count: 7}
+        timeToTeam:
+          - {priority: P1, cases: 4, medianToTeamMinutes: 9, slaMinutes: 10, lateCount: 1, medianToResolveMinutes: 73}
+          - {priority: P2, cases: 8, medianToTeamMinutes: 22, slaMinutes: 30, lateCount: 0, medianToResolveMinutes: 92}
+          - {priority: P3, cases: 2, medianToTeamMinutes: 61, slaMinutes: 120, lateCount: 0, medianToResolveMinutes: 113}
+        stuckCases:
+          - {caseId: c1036000-0000-4000-8000-000000001036, caseCode: '#1036', priority: P2, summary: 'Nhà thấp, nước lên nhanh', place: An Thạch, reason: TEAM_SILENT, minutes: 34, teamName: Đội 3}
+          - {caseId: c1042000-0000-4000-8000-000000001042, caseCode: '#1042', priority: P1, summary: 'Trên mái nhà, có trẻ 8 tháng', place: 'Thôn 3, Hòa Thịnh', reason: OVERDUE, minutes: 4}
+          - {caseId: c1038000-0000-4000-8000-000000001038, caseCode: '#1038', priority: P2, summary: '2 ông bà với cháu nhỏ, chưa ai tới', place: 'Thôn 3, Hòa Thịnh', reason: DUE_SOON, minutes: 2}
+          - {caseId: c1045000-0000-4000-8000-000000001045, caseCode: '#1045', priority: P1, summary: 'Nước đang lên, 2 người già', place: 'Xóm 5, Hòa Xuân', reason: DUE_SOON, minutes: 3}
+        byStatus:
+          - {status: NEW, count: 5}
+          - {status: TRIAGED, count: 7}
+          - {status: EN_ROUTE, count: 2}
+          - {status: RESOLVED, count: 12}
+          - {status: INVALID, count: 2}
+          - {status: MERGED, count: 1}
+        byPriority:
+          - {priority: P1, count: 8}
+          - {priority: P2, count: 14}
+          - {priority: P3, count: 5}
+          - {priority: P4, count: 2}
+    AiQualityExample:
+      summary: Against 23 cases a person has finalised
+      value:
+        eventId: 7b1e2c44-5a10-4c7e-9a31-2f6d8e0a1b01
+        reviewedCases: 23
+        p1Recall: {caught: 5, total: 6}
+        priorityRaised: 2
+        priorityLowered: 0
+        mergeSuggestions: {accepted: 1, total: 3, pending: 2}
+        latency: {averageMs: 4000, maxMs: 11000, failures: 1}
+        cost: {usd: 0.41, cases: 29}
+        fields:
+          - {field: phones, correct: 21, graded: 22, rate: 0.95}
+          - {field: situation, correct: 21, graded: 23, rate: 0.91}
+          - {field: vulnerable, correct: 20, graded: 23, rate: 0.87}
+          - {field: peopleCount, correct: 19, graded: 23, rate: 0.83}
+          - {field: address, correct: 17, graded: 23, rate: 0.74}
+        priorityMatrix:
+          - {aiPriority: P1, finalP1: 5, finalP2: 0, finalP3: 0, finalP4: 0}
+          - {aiPriority: P2, finalP1: 1, finalP2: 9, finalP3: 0, finalP4: 0}
+          - {aiPriority: P3, finalP1: 0, finalP2: 1, finalP3: 5, finalP4: 0}
+          - {aiPriority: P4, finalP1: 0, finalP2: 0, finalP3: 0, finalP4: 2}
+        raisedCases:
+          - {caseId: c1026000-0000-4000-8000-000000001026, caseCode: '#1026', aiPriority: P2, finalPriority: P1, reason: 'Tin chỉ ghi "ngã", gọi lại mới biết là ngã trong nhà đang ngập', correctedByName: Lan}
+          - {caseId: c1031000-0000-4000-8000-000000001031, caseCode: '#1031', aiPriority: P3, finalPriority: P2, reason: 'Có thai phụ, AI không nhận ra chữ "bầu"', correctedByName: Sơn}

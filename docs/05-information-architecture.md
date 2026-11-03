@@ -1,68 +1,68 @@
 # 05 — Information Architecture & Screen Hierarchy
 
-> Trạng thái thiết kế: **TARGET V1**
+> Design status: **TARGET V1**
 
-SOSLink có **4 giao diện** cho 4 hoàn cảnh sử dụng rất khác nhau, dùng chung một backend:
+SOSLink has **4 interfaces** for 4 very different situations, sharing one backend:
 
-| Giao diện | Người dùng | Bố cục | Thiết bị, hoàn cảnh |
+| Interface | Users | Layout | Device, situation |
 |---|---|---|---|
-| **Trang công khai** | Người dân | Một cột, rất nhẹ, không cần đăng nhập | Điện thoại, mạng yếu, đang hoảng loạn |
-| **Nhập tin** | Tình nguyện viên | Một màn hình tối giản | Laptop hoặc điện thoại, thao tác lặp lại liên tục |
-| **Trung tâm điều phối** | Điều phối viên, Quản trị viên | Toàn màn hình: bản đồ + hàng đợi | Màn hình lớn, trực nhiều giờ |
-| **Nhiệm vụ** | Đội trưởng | Một cột, nút lớn, hỗ trợ mất mạng | Điện thoại ngoài trời, tay ướt |
+| **Public pages** | Residents | One column, very light, no login | Phone, weak network, panicking |
+| **Intake** | Volunteers | One minimal screen | Laptop or phone, constantly repeated actions |
+| **Command centre** | Coordinators, Administrators | Full screen: map + queue | Large screen, long shifts |
+| **Missions** | Team leaders | One column, large buttons, offline support | Phone outdoors, wet hands |
 
-Sau khi đăng nhập, hệ thống điều hướng theo vai trò: `VOLUNTEER` → `/intake`, `COORDINATOR`/`ADMIN` → `/command`, `TEAM` → `/team`. Vào sai giao diện → `403`.
+After login, the system routes by role: `VOLUNTEER` → `/intake`, `COORDINATOR`/`ADMIN` → `/command`, `TEAM` → `/team`. Wrong interface → `403`.
 
-## 1. Cây Information Architecture
+## 1. Information architecture tree
 
 ```text
 SOSLink
 │
-├── Trang công khai (không cần đăng nhập)
-│   ├── Gửi tin cầu cứu
-│   │   └── Đã gửi: hiện mã tra cứu
-│   └── Tra cứu tình trạng bằng mã
+├── Public pages (no login)
+│   ├── Send a call for help
+│   │   └── Sent: shows tracking code
+│   └── Look up status by code
 │
-├── Tài khoản
-│   ├── Đăng nhập
-│   ├── Kích hoạt tài khoản (link mời)
-│   └── Hồ sơ cá nhân
+├── Account
+│   ├── Log in
+│   ├── Activate account (invitation link)
+│   └── Personal profile
 │
-├── Nhập tin (VOLUNTEER)
-│   ├── Nhập tin mới (dán chữ, tải ảnh)
-│   └── Tin của tôi (trạng thái xử lý, ghi xác minh)
+├── Intake (VOLUNTEER)
+│   ├── New message (paste text, upload images)
+│   └── My messages (processing status, record verification)
 │
-├── Trung tâm điều phối (COORDINATOR, ADMIN)
-│   ├── Bản đồ điều phối (bản đồ · hàng đợi · đội)
-│   │   ├── Phân công đội (modal)
-│   │   └── Cảnh báo (panel)
-│   ├── Chờ duyệt (hàng đợi theo ưu tiên)
-│   │   └── Duyệt ca (tin gốc · kết quả AI · vị trí)
-│   │       └── So sánh gộp tin (modal)
-│   ├── Tất cả ca
-│   │   └── Chi tiết ca (thông tin · các tin gốc · dòng thời gian)
-│   └── Báo cáo
-│       ├── Dashboard theo đợt
-│       └── Báo cáo sau sự kiện
+├── Command centre (COORDINATOR, ADMIN)
+│   ├── Command map (map · queue · teams)
+│   │   ├── Assign team (modal)
+│   │   └── Alerts (panel)
+│   ├── Awaiting review (queue by priority)
+│   │   └── Review case (original message · AI result · location)
+│   │       └── Compare and merge (modal)
+│   ├── All cases
+│   │   └── Case detail (information · original messages · timeline)
+│   └── Reports
+│       ├── Event dashboard
+│       └── After-action report
 │
-├── Nhiệm vụ (TEAM)
-│   ├── Nhiệm vụ của đội
-│   └── Chi tiết nhiệm vụ
-│       └── Báo kết quả (bottom sheet)
+├── Missions (TEAM)
+│   ├── Team missions
+│   └── Mission detail
+│       └── Report outcome (bottom sheet)
 │
-├── Quản trị (ADMIN)
-│   ├── Đợt thiên tai và cấu hình
-│   ├── Tài khoản
-│   ├── Đội cứu hộ
-│   ├── Chất lượng AI
-│   └── Nhật ký
+├── Administration (ADMIN)
+│   ├── Disaster events and configuration
+│   ├── Accounts
+│   ├── Rescue teams
+│   ├── AI quality
+│   └── Audit log
 │
-└── Hệ thống: 403 · 404
+└── System: 403 · 404
 ```
 
-## 2. Screen Hierarchy
+## 2. Screen hierarchy
 
-### 2.1 Trang công khai và Nhập tin
+### 2.1 Public pages and Intake
 
 ```mermaid
 flowchart LR
@@ -72,7 +72,7 @@ flowchart LR
     s10 --> s11["SCR-11 Tin của tôi"]
 ```
 
-### 2.2 Trung tâm điều phối
+### 2.2 Command centre
 
 ```mermaid
 flowchart LR
@@ -88,7 +88,7 @@ flowchart LR
     s40 --> s41["SCR-41 Báo cáo sau sự kiện"]
 ```
 
-### 2.3 Nhiệm vụ và Quản trị
+### 2.3 Missions and Administration
 
 ```mermaid
 flowchart LR
@@ -101,39 +101,39 @@ flowchart LR
     a --> s54["SCR-54 Nhật ký"]
 ```
 
-## 3. Danh sách màn hình
+## 3. Screen list
 
-| Screen ID | Màn hình | Kiểu | Vai trò | Stories |
+| Screen ID | Screen | Type | Role | Stories |
 |---|---|---|---|---|
-| `SCR-01` | Gửi tin cầu cứu | Page | Công khai | US03 |
-| `SCR-02` | Đã gửi, hiện mã | Page | Công khai | US03 |
-| `SCR-03` | Tra cứu tình trạng | Page | Công khai | US04 |
-| `SCR-04` | Đăng nhập | Page | Công khai | US01 |
-| `SCR-05` | Kích hoạt tài khoản | Page | Có link mời | US21 |
-| `SCR-06` | Hồ sơ cá nhân | Page | Nội bộ | US02 |
-| `SCR-10` | Nhập tin mới | Page | VOLUNTEER, COORDINATOR, ADMIN | US05 |
-| `SCR-11` | Tin của tôi | Page | VOLUNTEER | US05, US13 |
-| `SCR-20` | Bản đồ điều phối | Page | COORDINATOR, ADMIN | US08, US14 |
-| `SCR-21` | Chờ duyệt | Page | COORDINATOR, ADMIN | US10, US11 |
-| `SCR-22` | Duyệt ca | Page | COORDINATOR, ADMIN | US07–US11, US13 |
-| `SCR-23` | So sánh gộp tin | Modal | COORDINATOR, ADMIN | US09, US12 |
-| `SCR-24` | Phân công đội | Modal | COORDINATOR, ADMIN | US15 |
-| `SCR-25` | Chi tiết ca | Page | COORDINATOR, ADMIN | US12, US18 |
-| `SCR-26` | Tất cả ca | Page | COORDINATOR, ADMIN | US14 |
-| `SCR-27` | Cảnh báo | Panel | COORDINATOR, ADMIN | US16 |
-| `SCR-30` | Nhiệm vụ của đội | Page | TEAM | US17 |
-| `SCR-31` | Chi tiết nhiệm vụ | Page | TEAM | US17 |
-| `SCR-32` | Báo kết quả | Bottom sheet | TEAM | US18 |
-| `SCR-40` | Dashboard theo đợt | Page | COORDINATOR, ADMIN | US19 |
-| `SCR-41` | Báo cáo sau sự kiện | Page | COORDINATOR, ADMIN | US19 |
-| `SCR-50` | Đợt thiên tai, cấu hình | Page | ADMIN | US23 |
-| `SCR-51` | Tài khoản | Page + modal | ADMIN | US21 |
-| `SCR-52` | Đội cứu hộ | Page + modal | ADMIN | US22 |
-| `SCR-53` | Chất lượng AI | Page | ADMIN | US20 |
-| `SCR-54` | Nhật ký | Page | ADMIN | US24 |
-| `SCR-90` · `SCR-91` | 403 · 404 | Page | Tất cả | — |
+| `SCR-01` | Send call for help | Page | Public | US03 |
+| `SCR-02` | Sent, shows code | Page | Public | US03 |
+| `SCR-03` | Look up status | Page | Public | US04 |
+| `SCR-04` | Log in | Page | Public | US01 |
+| `SCR-05` | Activate account | Page | Has invitation link | US21 |
+| `SCR-06` | Personal profile | Page | Internal | US02 |
+| `SCR-10` | New message | Page | VOLUNTEER, COORDINATOR, ADMIN | US05 |
+| `SCR-11` | My messages | Page | VOLUNTEER | US05, US13 |
+| `SCR-20` | Command map | Page | COORDINATOR, ADMIN | US08, US14 |
+| `SCR-21` | Awaiting review | Page | COORDINATOR, ADMIN | US10, US11 |
+| `SCR-22` | Review case | Page | COORDINATOR, ADMIN | US07–US11, US13 |
+| `SCR-23` | Compare and merge | Modal | COORDINATOR, ADMIN | US09, US12 |
+| `SCR-24` | Assign team | Modal | COORDINATOR, ADMIN | US15 |
+| `SCR-25` | Case detail | Page | COORDINATOR, ADMIN | US12, US18 |
+| `SCR-26` | All cases | Page | COORDINATOR, ADMIN | US14 |
+| `SCR-27` | Alerts | Panel | COORDINATOR, ADMIN | US16 |
+| `SCR-30` | Team missions | Page | TEAM | US17 |
+| `SCR-31` | Mission detail | Page | TEAM | US17 |
+| `SCR-32` | Report outcome | Bottom sheet | TEAM | US18 |
+| `SCR-40` | Event dashboard | Page | COORDINATOR, ADMIN | US19 |
+| `SCR-41` | After-action report | Page | COORDINATOR, ADMIN | US19 |
+| `SCR-50` | Events, configuration | Page | ADMIN | US23 |
+| `SCR-51` | Accounts | Page + modal | ADMIN | US21 |
+| `SCR-52` | Rescue teams | Page + modal | ADMIN | US22 |
+| `SCR-53` | AI quality | Page | ADMIN | US20 |
+| `SCR-54` | Audit log | Page | ADMIN | US24 |
+| `SCR-90` · `SCR-91` | 403 · 404 | Page | All | — |
 
-**Tổng: 28 màn hình.** US06 (Zalo OA) không có màn hình riêng: tin xuất hiện trong `SCR-21` với nhãn kênh.
+**Total: 28 screens.** US06 (Zalo OA) has no screen of its own: its messages appear in `SCR-21` with a channel label.
 
 ## 4. Routes
 
@@ -150,28 +150,28 @@ flowchart LR
 | `/admin/events` · `/admin/users` · `/admin/teams` · `/admin/ai-quality` · `/admin/audit` | SCR-50 → SCR-54 |
 | `/403` · `*` | SCR-90 · SCR-91 |
 
-## 5. Điều hướng
+## 5. Navigation
 
-**Trung tâm điều phối:** thanh trái thu gọn thành biểu tượng để nhường chỗ cho bản đồ.
+**Command centre:** the left rail collapses to icons to leave room for the map.
 
-| Mục | COORDINATOR | ADMIN |
+| Item | COORDINATOR | ADMIN |
 |---|:---:|:---:|
-| Bản đồ điều phối | ✓ | ✓ |
-| Chờ duyệt (badge số ca) | ✓ | ✓ |
-| Tất cả ca | ✓ | ✓ |
-| Nhập tin | ✓ | ✓ |
-| Báo cáo | ✓ | ✓ |
-| Quản trị | | ✓ |
+| Command map | ✓ | ✓ |
+| Awaiting review (case count badge) | ✓ | ✓ |
+| All cases | ✓ | ✓ |
+| Intake | ✓ | ✓ |
+| Reports | ✓ | ✓ |
+| Administration | | ✓ |
 
-Thanh trên luôn hiện: **đợt thiên tai đang chọn**, số ca P1 chưa có đội, chuông cảnh báo (riêng trang Bản đồ hiện cảnh báo ở cột phải), trạng thái kết nối. Mục không có quyền **không được render**.
+The top bar always shows: **selected disaster event**, number of P1 cases with no team, alert bell (the Map page shows alerts in its right column instead), connection status. Items without permission **are not rendered**.
 
-**Trang công khai:** không có menu. Số **112** luôn hiện ở đầu trang.
+**Public pages:** no menu. The number **112** is always at the top of the page.
 
-**Nhiệm vụ:** không có menu; chỉ một danh sách, nhiệm vụ đang làm luôn nằm trên cùng.
+**Missions:** no menu; one list only, with the active mission always on top.
 
-## 6. Luồng người dùng chính
+## 6. Main user flows
 
-### 6.1 Tình nguyện viên nhập tin
+### 6.1 Volunteer entering messages
 
 ```mermaid
 flowchart LR
@@ -181,7 +181,7 @@ flowchart LR
     d -.-> e["SCR-11 Thấy trạng thái"]
 ```
 
-### 6.2 Điều phối viên xử lý một ca
+### 6.2 Coordinator handling a case
 
 ```mermaid
 flowchart LR
@@ -194,7 +194,7 @@ flowchart LR
     f --> g["SCR-20 Theo dõi trên bản đồ"]
 ```
 
-### 6.3 Đội cứu hộ
+### 6.3 Rescue team
 
 ```mermaid
 flowchart LR
@@ -204,27 +204,27 @@ flowchart LR
     d -- "Mất mạng" --> e["Lưu máy, tự gửi lại"]
 ```
 
-## 7. Trạng thái màn hình
+## 7. Screen states
 
-| Trạng thái | Hiển thị |
+| State | Display |
 |---|---|
-| Loading | Skeleton; bản đồ giữ dữ liệu cũ kèm nhãn thời gian |
-| Rỗng (hàng đợi) | "Không còn ca chờ duyệt" |
-| AI đang xử lý | Ca hiện nhãn "AI đang đọc", nhưng **vẫn mở và duyệt được** bằng tin gốc |
-| AI lỗi | Nhãn "CẦN NGƯỜI ĐỌC", mức tối thiểu P2 |
-| Chưa có vị trí | Ca nằm ở mục riêng "Chưa có vị trí" trong hàng đợi, không biến mất khỏi bản đồ |
-| Mất kết nối (điều phối) | Banner đỏ "Dữ liệu dừng cập nhật lúc HH:mm"; khóa nút phân công |
-| Mất mạng (đội, form) | Banner "Đã lưu, sẽ gửi khi có mạng" |
-| Xung đột | "Ca này vừa được Lan phân công cho Đội 3" + tải lại |
-| Không có quyền | Trang 403 |
+| Loading | Skeleton; the map keeps old data with a time label |
+| Empty (queue) | "Không còn ca chờ duyệt" (no cases awaiting review) |
+| AI processing | The case shows the label "AI đang đọc" (AI reading), but **can still be opened and reviewed** from the original message |
+| AI failed | Label "CẦN NGƯỜI ĐỌC" (needs a human read), at least P2 |
+| No location | The case sits in a separate "Chưa có vị trí" (no location) section of the queue, and does not vanish from view |
+| Disconnected (command centre) | Red banner "Dữ liệu dừng cập nhật lúc HH:mm" (data stopped updating at HH:mm); the assign button is locked |
+| Offline (team, form) | Banner saying the data is saved and will be sent when online |
+| Conflict | "Ca này vừa được Lan phân công cho Đội 3" (this case was just assigned to Team 3 by Lan) + reload |
+| No permission | 403 page |
 
-## 8. Ánh xạ Story → Màn hình
+## 8. Story → Screen mapping
 
-| Story | Màn hình chính |
+| Story | Main screens |
 |---|---|
 | US01 · US02 | SCR-04 · SCR-06 |
 | US03 · US04 | SCR-01, SCR-02 · SCR-03 |
-| US05 · US06 | SCR-10, SCR-11 · hiện trong SCR-21 |
+| US05 · US06 | SCR-10, SCR-11 · shown in SCR-21 |
 | US07 · US08 · US10 · US11 | SCR-22 |
 | US09 · US12 | SCR-22 → SCR-23 |
 | US13 | SCR-22, SCR-11 |
@@ -235,4 +235,4 @@ flowchart LR
 
 ---
 
-**Liên quan:** [Use cases](03-use-cases.md) · [User stories](04-user-stories.md) · [UI/UX](06-ui-ux.md)
+**Related:** [Use cases](03-use-cases.md) · [User stories](04-user-stories.md) · [UI/UX](06-ui-ux.md)

@@ -1,36 +1,36 @@
-# SOSLink — Điều phối tin cầu cứu mùa lũ bằng AI
+# SOSLink — AI-assisted Coordination of Flood Rescue Requests
 
-> Trạng thái thiết kế: **TARGET V1** · Giai đoạn: **Requirements & Design**
+> Design status: **TARGET V1** · Phase: **Requirements & Design**
 
-**SOSLink** biến lượng lớn tin cầu cứu lộn xộn trong mùa lũ thành **danh sách ca đã gộp, đã ưu tiên, có người phụ trách và được theo dõi đến khi đóng**. AI đọc tin, trích thông tin, đề xuất gộp và mức ưu tiên; **con người duyệt và phân công**.
+**SOSLink** turns a large volume of messy flood rescue messages into **a list of cases that are merged, prioritised, owned by someone and tracked until closed**. AI reads messages, extracts information, and suggests merges and priorities; **people review and assign**.
 
 ---
 
-## 1. Giới thiệu dự án
+## 1. Project introduction
 
-### 1.1 Bối cảnh
+### 1.1 Context
 
-Khi nước dâng trong đêm, nhiều người [đăng tin cầu cứu trên Facebook và Zalo](https://plo.vn/lu-dang-trong-dem-nguoi-dan-quang-tri-len-mang-cau-cuu-post597642.html). Số lượng tăng đột biến: năm 2020, Zalo ghi nhận [hơn 10.000 lời kêu cứu trong 4 ngày](https://znews.vn/nhung-dem-thuc-trang-va-hon-10000-loi-keu-cuu-tren-zalo-post1149198.html). Đợt mưa lũ cuối tháng 11/2025 làm [113 người chết riêng ở Đắk Lắk](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm).
+When water rises at night, many people [post calls for help on Facebook and Zalo](https://plo.vn/lu-dang-trong-dem-nguoi-dan-quang-tri-len-mang-cau-cuu-post597642.html). Volume spikes: in 2020, Zalo recorded [over 10,000 calls for help in 4 days](https://znews.vn/nhung-dem-thuc-trang-va-hon-10000-loi-keu-cuu-tren-zalo-post1149198.html). The floods of late 11/2025 left [113 dead in Đắk Lắk alone](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm).
 
-### 1.2 Khoảng trống
+### 1.2 The gap
 
-Các giải pháp như [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) và [thongtincuuho.org](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) đã trả lời khá tốt câu hỏi **"ai cần cứu, ở đâu"**. SOSLink tập trung vào phần tiếp theo:
+Solutions such as [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) and [thongtincuuho.org](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) answer **"who needs rescue, and where"** fairly well. SOSLink focuses on what comes next:
 
-> **"Đã có ai đi cứu chưa? Ai đi? Xong chưa?"**
+> **"Has anyone gone yet? Who? Is it done?"**
 
-| Mã | Painpoint | Hậu quả |
+| Code | Pain point | Consequence |
 |---|---|---|
-| P1 | Tin tự do, viết tắt, thiếu thông tin | Mất thời gian đọc, gọi lại |
-| P2 | Lượng tin tăng đột biến | Quá tải, bỏ sót |
-| P3 | Một ca được đăng nhiều lần | Nhiều đội đến một nơi, nơi khác không có ai |
-| P4 | Tin cũ, tin chưa xác minh | Lãng phí lực lượng |
-| P5 | Ưu tiên theo cảm tính | Ca nguy hiểm bị xử lý muộn |
-| P6 | Không biết ca nào đã được cứu | Không khép được vòng |
-| P7 | Người gửi không biết tin đã được nhận chưa | Hoảng loạn, đăng lại nhiều lần |
+| P1 | Free-form messages, abbreviations, missing information | Time lost reading and calling back |
+| P2 | Message volume spikes | Overload, missed messages |
+| P3 | One case is posted many times | Several teams go to one place, nobody goes elsewhere |
+| P4 | Old messages, unverified messages | Wasted resources |
+| P5 | Prioritising by gut feeling | Dangerous cases handled late |
+| P6 | Nobody knows which cases were rescued | The loop never closes |
+| P7 | Senders do not know if their message was received | Panic, repeated posting |
 
-Trừ P2, các painpoint trên **là giả thuyết** dựng từ báo chí, cần kiểm chứng bằng phỏng vấn nhóm cứu hộ. Chi tiết: [docs/01-research.md](docs/01-research.md).
+Except for P2, these pain points **are hypotheses** built from press coverage, to be validated by interviewing rescue groups. Details: [docs/01-research.md](docs/01-research.md).
 
-### 1.3 Workflow AI tự động
+### 1.3 Automated AI workflow
 
 ```mermaid
 flowchart LR
@@ -42,128 +42,226 @@ flowchart LR
     F --> G["Đóng ca, báo cáo"]
 ```
 
-**Nguyên tắc an toàn:** không tin nào bị mất · AI chỉ đề xuất · không chắc thì ưu tiên cao hơn · hệ thống vẫn chạy khi AI hỏng. Chi tiết: [docs/02-scope.md](docs/02-scope.md).
+**Safety principles:** no message is ever lost · AI only suggests · when unsure, go higher · the system keeps running when AI fails. Details: [docs/02-scope.md](docs/02-scope.md).
 
-### 1.4 Ngoài phạm vi V1
+### 1.4 Out of scope for V1
 
-Tự quét mạng xã hội, thay thế tổng đài 112, bản đồ công khai chứa dữ liệu cá nhân, dẫn đường theo đường ngập, quản lý hàng cứu trợ, tự train model.
-
----
-
-## 2. Product Mindmap
-
-Xem bản gốc trên Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Mỗi nhánh có một màu riêng.
-
-![SOSLink Product Mindmap](docs/mindmap/soslink-mindmap.png)
+Automatically scanning social media, replacing the 112 hotline, a public map with personal data, routing around flooded roads, managing relief goods, training a custom model.
 
 ---
 
-## 3. Vai trò & Phân quyền
+## 2. Product mindmap
 
-| Vai trò | Mã | Mô tả |
+See the original on Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Each branch has its own colour.
+
+![SOSLink product mindmap](docs/mindmap/soslink-mindmap.png)
+
+---
+
+## 3. Roles & permissions
+
+| Role | Code | Description |
 |---|---|---|
-| Người dân | — | Gửi tin, tra cứu bằng mã; không cần tài khoản |
-| Tình nguyện viên | `VOLUNTEER` | Dán tin từ mạng xã hội, ghi nhận xác minh |
-| Điều phối viên | `COORDINATOR` | Duyệt ca, gộp tin, phân công đội, xem báo cáo |
-| Đội cứu hộ | `TEAM` | Nhận nhiệm vụ, báo kết quả |
-| Quản trị viên | `ADMIN` | Toàn quyền điều phối + tài khoản, đội, cấu hình, nhật ký |
+| Resident | — | Sends messages, looks up by code; no account needed |
+| Volunteer | `VOLUNTEER` | Pastes messages from social media, records verification |
+| Coordinator | `COORDINATOR` | Reviews cases, merges messages, assigns teams, views reports |
+| Rescue team | `TEAM` | Receives missions, reports outcomes |
+| Administrator | `ADMIN` | Full coordination rights + accounts, teams, configuration, audit log |
 
-| Chức năng | Người dân | VOLUNTEER | COORDINATOR | TEAM | ADMIN |
+| Function | Resident | VOLUNTEER | COORDINATOR | TEAM | ADMIN |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Gửi tin qua form, tra cứu bằng mã | ✓ | | | | |
-| Dán tin, ảnh chụp | | ✓ | ✓ | | ✓ |
-| Xem tin | | Của mình | Tất cả | Ca được giao | Tất cả |
-| Duyệt, gộp tin, đổi ưu tiên | | | ✓ | | ✓ |
-| Phân công đội | | | ✓ | | ✓ |
-| Nhận nhiệm vụ, báo kết quả | | | | ✓ | |
-| Báo cáo | | | ✓ | | ✓ |
-| Chất lượng AI, nhật ký, cấu hình | | | | | ✓ |
+| Send through the form, look up by code | ✓ | | | | |
+| Paste messages, screenshots | | ✓ | ✓ | | ✓ |
+| View messages | | Own | All | Assigned cases | All |
+| Review, merge, change priority | | | ✓ | | ✓ |
+| Assign teams | | | ✓ | | ✓ |
+| Receive missions, report outcomes | | | | ✓ | |
+| Reports | | | ✓ | | ✓ |
+| AI quality, audit log, configuration | | | | | ✓ |
 
-Backend kiểm tra quyền trên mọi API. Ma trận đầy đủ: [docs/03-use-cases.md](docs/03-use-cases.md).
-
----
-
-## 4. Use Case tổng quát
-
-![Use Case tổng quát](docs/usecase/ucd-overview.svg)
-
-Danh sách 24 use case và đặc tả luồng: [docs/03-use-cases.md](docs/03-use-cases.md).
+The backend checks permissions on every API call. Full matrix: [docs/03-use-cases.md](docs/03-use-cases.md).
 
 ---
 
-## 5. User Stories — INVEST
+## 4. Overall use case
 
-Backlog gồm **24 user story** (17 Must · 5 Should · 2 Could), mỗi story đều được đánh giá theo INVEST và có acceptance criteria.
+![Overall use case](docs/usecase/ucd-overview.svg)
 
-| Tiêu chí | Ý nghĩa trong SOSLink |
+List of 24 use cases and flow specifications: [docs/03-use-cases.md](docs/03-use-cases.md).
+
+---
+
+## 5. User stories — INVEST
+
+The backlog has **24 user stories** (17 Must · 5 Should · 2 Could), each assessed against INVEST and with acceptance criteria.
+
+| Criterion | Meaning in SOSLink |
 |---|---|
-| **I**ndependent | Mỗi story demo được riêng |
-| **N**egotiable | Giao diện có thể đổi; quy tắc an toàn thì không |
-| **V**aluable | Gắn với một vai trò và painpoint P1–P7 |
-| **E**stimable | Đầu vào, đầu ra, quy tắc, ngoại lệ được ghi rõ |
-| **S**mall | Làm xong trong ≤ 3 ngày/người |
-| **T**estable | Có acceptance criteria quan sát được |
+| **I**ndependent | Each story can be demoed alone |
+| **N**egotiable | The interface can change; safety rules cannot |
+| **V**aluable | Tied to a role and a pain point P1–P7 |
+| **E**stimable | Inputs, outputs, rules and exceptions are written down |
+| **S**mall | Done in ≤ 3 person-days |
+| **T**estable | Has observable acceptance criteria |
 
-| Nhóm | Stories |
+| Group | Stories |
 |---|---|
-| Tài khoản | US01 Đăng nhập · US02 Hồ sơ |
-| Tiếp nhận | US03 Gửi tin · US04 Tra cứu · US05 Dán tin · US06 Zalo OA |
-| Xử lý AI | US07 Trích xuất · US08 Định vị · US09 Đề xuất trùng · US10 Đề xuất ưu tiên |
-| Duyệt ca | US11 Duyệt · US12 Gộp, hoàn tác · US13 Xác minh |
-| Điều phối | US14 Bản đồ, hàng đợi · US15 Phân công · US16 Cảnh báo |
-| Đội cứu hộ | US17 Nhận nhiệm vụ · US18 Báo kết quả |
-| Báo cáo | US19 Dashboard · US20 Chất lượng AI |
-| Quản trị | US21 Tài khoản · US22 Đội · US23 Đợt thiên tai · US24 Nhật ký, ẩn danh |
+| Accounts | US01 Log in · US02 Profile |
+| Intake | US03 Send message · US04 Look up · US05 Paste message · US06 Zalo OA |
+| AI processing | US07 Extraction · US08 Geocoding · US09 Duplicate suggestions · US10 Priority suggestions |
+| Case review | US11 Review · US12 Merge, undo · US13 Verification |
+| Dispatch | US14 Map, queue · US15 Assignment · US16 Alerts |
+| Rescue teams | US17 Receive mission · US18 Report outcome |
+| Reports | US19 Dashboard · US20 AI quality |
+| Administration | US21 Accounts · US22 Teams · US23 Disaster events · US24 Audit log, anonymisation |
 
-Backlog đầy đủ, bảng INVEST và acceptance criteria: [docs/04-user-stories.md](docs/04-user-stories.md).
+Full backlog, INVEST table and acceptance criteria: [docs/04-user-stories.md](docs/04-user-stories.md).
 
 ---
 
-## 6. Information Architecture
+## 6. Information architecture
 
 ```text
 SOSLink
-├── Trang công khai: Gửi tin · Tra cứu bằng mã
-├── Nhập tin (VOLUNTEER): Nhập tin mới · Tin của tôi
-├── Trung tâm điều phối (COORDINATOR, ADMIN)
-│   ├── Bản đồ điều phối → Phân công đội · Cảnh báo
-│   ├── Chờ duyệt → Duyệt ca → So sánh gộp tin
-│   ├── Tất cả ca → Chi tiết ca
-│   └── Báo cáo
-├── Nhiệm vụ (TEAM): Danh sách → Chi tiết → Báo kết quả
-└── Quản trị (ADMIN): Đợt thiên tai · Tài khoản · Đội · Chất lượng AI · Nhật ký
+├── Public pages: Send message · Look up by code
+├── Intake (VOLUNTEER): New message · My messages
+├── Command centre (COORDINATOR, ADMIN)
+│   ├── Command map → Assign team · Alerts
+│   ├── Awaiting review → Review case → Compare and merge
+│   ├── All cases → Case detail
+│   └── Reports
+├── Missions (TEAM): List → Detail → Report outcome
+└── Administration (ADMIN): Disaster events · Accounts · Teams · AI quality · Audit log
 ```
 
-Screen hierarchy, 28 màn hình, route, luồng và trạng thái: [docs/05-information-architecture.md](docs/05-information-architecture.md).
+Screen hierarchy, 28 screens, routes, flows and states: [docs/05-information-architecture.md](docs/05-information-architecture.md).
 
 ---
 
 ## 7. UI/UX
 
-Thiết kế và các màn hình chính: [docs/06-ui-ux.md](docs/06-ui-ux.md). Ảnh chụp chia theo vai trò: [docs/screenshots/](docs/screenshots/README.md).
+Design and main screens: [docs/06-ui-ux.md](docs/06-ui-ux.md). Screenshots by role: [docs/screenshots/](docs/screenshots/README.md).
 
-![Bản đồ điều phối](docs/screenshots/coordinator/scr-20-command.png)
+![Command map](docs/screenshots/coordinator/scr-20-command.png)
 
-Ảnh chụp từ prototype tĩnh, chưa nối backend. **Toàn bộ dữ liệu trong ảnh là dữ liệu mẫu**, gồm tên người, đội, số điện thoại, số liệu và ca cứu hộ; vị trí trên bản đồ chỉ là ước lượng.
-
----
-
-## 8. Dữ liệu
-
-DBML gồm 19 bảng; **tách tin gốc (`reports`) khỏi ca đã chuẩn hóa (`cases`)** để gộp tin mà không mất dữ liệu: [docs/07-data-model.md](docs/07-data-model.md) · [docs/database/soslink.dbml](docs/database/soslink.dbml).
+The interface is in Vietnamese. It is a sample interface, not connected to a backend. **All data in the images is sample data**, including names, teams, phone numbers, figures and rescue cases; map locations are only estimates.
 
 ---
 
-## 9. Tài liệu
+## 8. Data
 
-| # | Yêu cầu | Tài liệu | Trạng thái |
+The DBML has 19 tables; **original messages (`reports`) are separate from normalised cases (`cases`)** so messages can be merged without losing data: [docs/07-data-model.md](docs/07-data-model.md) · [docs/database/soslink.dbml](docs/database/soslink.dbml).
+
+---
+
+## 9. OpenAPI
+
+API contract in OpenAPI 3.0.4, base `/api/v1`, JWT authentication for 60 minutes, errors per RFC 7807. Each operation states which roles may call it and which stories it serves; US01–US24 are all covered.
+
+```text
+58 paths · 68 operations · 16 groups
+Resending creates no duplicates: idempotencyKey, clientUpdateId
+Preventing duplicate assignment: version and partial unique index
+Public pages return no personal data
+```
+
+[OpenAPI specification](docs/api/openapi.yaml) · [Documentation and sample calls](docs/api/README.md).
+
+---
+
+## 10. C4 architecture
+
+### C1 — System context
+
+```mermaid
+flowchart LR
+    people(["Người dân, Tình nguyện viên,<br/>Điều phối viên, Đội trưởng, Quản trị viên"])
+    soslink["SOSLink<br/><i>[Software System]</i><br/>Biến tin cầu cứu thành danh sách ca đã gộp, đã ưu tiên,<br/>có người phụ trách và được theo dõi đến khi đóng"]
+    claude["Claude API<br/><i>[External System]</i>"]
+    geocoder["Dịch vụ định vị<br/><i>[External System]</i>"]
+    osm["OpenStreetMap<br/><i>[External System]</i>"]
+    zalo["Zalo OA<br/><i>[External System]</i>"]
+    people --> soslink
+    soslink -- "đọc tin" --> claude
+    soslink -- "đổi địa chỉ thành tọa độ" --> geocoder
+    soslink -- "ảnh nền bản đồ" --> osm
+    zalo -. "webhook" .-> soslink
+    style soslink fill:#1168bd,color:#fff,stroke:#0b4884
+    style claude fill:#999,color:#fff
+    style geocoder fill:#999,color:#fff
+    style osm fill:#999,color:#fff
+    style zalo fill:#999,color:#fff
+```
+
+### C2 — Containers
+
+```mermaid
+flowchart TB
+    people(["Người dùng"])
+    subgraph platform["SOSLink"]
+        web["Web App<br/><i>React + Vite, PWA</i>"]
+        outbox[("Outbox trên máy<br/><i>IndexedDB</i>")]
+        api["API<br/><i>ASP.NET Core + SignalR</i>"]
+        worker["Worker<br/><i>.NET Worker Service</i>"]
+        db[("PostgreSQL + PostGIS")]
+        files[("Kho ảnh")]
+    end
+    claude["Claude API"]
+    geocoder["Dịch vụ định vị"]
+    people --> web
+    web <--> outbox
+    web -- "REST" --> api
+    api -. "SignalR" .-> web
+    api --> db
+    api --> files
+    worker --> db
+    worker --> files
+    db -. "NOTIFY" .-> api
+    worker --> claude
+    worker --> geocoder
+    style web fill:#1168bd,color:#fff
+    style api fill:#1168bd,color:#fff
+    style worker fill:#1168bd,color:#fff
+    style db fill:#1168bd,color:#fff
+    style files fill:#3a7bd5,color:#fff
+    style outbox fill:#3a7bd5,color:#fff
+    style claude fill:#999,color:#fff
+    style geocoder fill:#999,color:#fff
+```
+
+The Worker is separate from the API so that slow or failing AI does not block intake. The queue lives in PostgreSQL, so a message and the work to do on it are written in the same transaction.
+
+C1–C4 details and two sequence diagrams: [docs/architecture/c4](docs/architecture/c4/README.md).
+
+---
+
+## 11. Code structure
+
+```text
+src/
+├── frontend/          # React + Vite: features by screen, outbox for offline use
+├── backend/
+│   ├── SOSLink.Api/             # Controllers, SignalR
+│   ├── SOSLink.Worker/          # AI, overdue alerts, anonymisation
+│   ├── SOSLink.Application/     # Business logic, framework-independent
+│   └── SOSLink.Infrastructure/  # EF Core, Claude API, geocoding, image store
+└── database/seed/     # Demo data
+```
+
+The technology is a default choice and can change. Full folder tree, dependency rules and module mapping: [docs/08-code-structure.md](docs/08-code-structure.md).
+
+---
+
+## 12. Documents
+
+| # | Requirement | Document | Status |
 |---|---|---|---|
-| 1 | Phân tích đề bài top-down | [01-research.md](docs/01-research.md) · [02-scope.md](docs/02-scope.md) | ✅ |
-| 2 | Use case diagram, User stories INVEST | [03-use-cases.md](docs/03-use-cases.md) · [04-user-stories.md](docs/04-user-stories.md) | ✅ |
+| 1 | Top-down problem analysis | [01-research.md](docs/01-research.md) · [02-scope.md](docs/02-scope.md) | ✅ |
+| 2 | Use case diagram, INVEST user stories | [03-use-cases.md](docs/03-use-cases.md) · [04-user-stories.md](docs/04-user-stories.md) | ✅ |
 | 3 | Information architecture | [05-information-architecture.md](docs/05-information-architecture.md) | ✅ |
 | 4 | UI/UX | [06-ui-ux.md](docs/06-ui-ux.md) | ✅ |
 | 5 | DBML | [07-data-model.md](docs/07-data-model.md) · [soslink.dbml](docs/database/soslink.dbml) | ✅ |
-| 6 | OpenAPI | — | ⏳ Chưa làm |
-| 7 | C4 Documentation | — | ⏳ Chưa làm |
-| 8 | Code structure | — | ⏳ Chưa làm |
-| 9 | Code | — | ⏳ Chưa làm |
+| 6 | OpenAPI | [openapi.yaml](docs/api/openapi.yaml) · [README](docs/api/README.md) | ✅ |
+| 7 | C4 documentation | [docs/architecture/c4](docs/architecture/c4/README.md) | ✅ |
+| 8 | Code structure | [08-code-structure.md](docs/08-code-structure.md) | ✅ |
+| 9 | Code | — | ⏳ Not started |

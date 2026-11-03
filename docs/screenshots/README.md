@@ -1,198 +1,198 @@
-# Ảnh chụp giao diện SOSLink
+# SOSLink interface screenshots
 
-Chụp từ prototype tĩnh, chưa nối backend. Toàn bộ dữ liệu trong ảnh là **dữ liệu mẫu**. Danh sách màn hình theo mã `SCR` nằm ở [05-information-architecture.md](../05-information-architecture.md#3-danh-sách-màn-hình).
+A sample interface in Vietnamese, not connected to a backend. All data in the images is **sample data**. The list of screens by `SCR` code is in [05-information-architecture.md](../05-information-architecture.md#3-screen-list).
 
-- [Người dân](#người-dân)
-- [Tình nguyện viên](#tình-nguyện-viên)
-- [Điều phối viên](#điều-phối-viên)
-- [Đội trưởng](#đội-trưởng)
-- [Quản trị viên](#quản-trị-viên)
-- [Dùng chung](#dùng-chung)
+- [Residents](#residents)
+- [Volunteers](#volunteers)
+- [Coordinators](#coordinators)
+- [Team leaders](#team-leaders)
+- [Administrators](#administrators)
+- [Shared](#shared)
 
-## Người dân
+## Residents
 
-### SCR-01 · Gửi tin cầu cứu
+### SCR-01 · Send call for help
 
 ![SCR-01](citizen/scr-01-sos-form.png)
 
-### SCR-02 · Đã gửi, hiện mã
+### SCR-02 · Sent, shows code
 
 ![SCR-02](citizen/scr-02-sos-sent.png)
 
-### SCR-03 · Tra cứu tình trạng
+### SCR-03 · Look up status
 
 ![SCR-03](citizen/scr-03-track.png)
 
-### Trạng thái · Mất mạng khi gửi tin
+### State · Offline when sending
 
-![Mất mạng khi gửi tin](citizen/state-offline-sos-form.png)
+![Offline when sending](citizen/state-offline-sos-form.png)
 
-## Tình nguyện viên
+## Volunteers
 
-### SCR-10 · Nhập tin mới
+### SCR-10 · New message
 
 ![SCR-10](volunteer/scr-10-intake.png)
 
-### SCR-11 · Tin của tôi
+### SCR-11 · My messages
 
 ![SCR-11](volunteer/scr-11-my-messages.png)
 
-## Điều phối viên
+## Coordinators
 
-### SCR-20 · Bản đồ điều phối
+### SCR-20 · Command map
 
 ![SCR-20](coordinator/scr-20-command.png)
 
-### SCR-21 · Chờ duyệt
+### SCR-21 · Awaiting review
 
 ![SCR-21](coordinator/scr-21-review-queue.png)
 
-### SCR-22 · Duyệt ca
+### SCR-22 · Review case
 
 ![SCR-22](coordinator/scr-22-review.png)
 
-### SCR-23 · So sánh gộp tin
+### SCR-23 · Compare and merge
 
 ![SCR-23](coordinator/scr-23-compare-merge.png)
 
-### SCR-24 · Phân công đội
+### SCR-24 · Assign team
 
 ![SCR-24](coordinator/scr-24-assign-team.png)
 
-### SCR-25 · Chi tiết ca
+### SCR-25 · Case detail
 
 ![SCR-25](coordinator/scr-25-case-detail.png)
 
-### SCR-25 · Cập nhật hộ đội
+### SCR-25 · Update on a team's behalf
 
-![Cập nhật hộ đội](coordinator/scr-25b-update-for-team.png)
+![Update on a team's behalf](coordinator/scr-25b-update-for-team.png)
 
-### SCR-26 · Tất cả ca
+### SCR-26 · All cases
 
 ![SCR-26](coordinator/scr-26-all-cases.png)
 
-### SCR-27 · Cảnh báo
+### SCR-27 · Alerts
 
 ![SCR-27](coordinator/scr-27-alerts.png)
 
-### SCR-40 · Dashboard theo đợt
+### SCR-40 · Event dashboard
 
 ![SCR-40](coordinator/scr-40-dashboard.png)
 
-### SCR-41 · Báo cáo sau sự kiện
+### SCR-41 · After-action report
 
 ![SCR-41](coordinator/scr-41-post-event-report.png)
 
-### Trạng thái · Đang tải
+### State · Loading
 
-![Đang tải ở Bản đồ](coordinator/state-loading-command.png)
+![Loading on the map](coordinator/state-loading-command.png)
 
-![Đang tải ở Tất cả ca](coordinator/state-loading-all-cases.png)
+![Loading on all cases](coordinator/state-loading-all-cases.png)
 
-### Trạng thái · Hàng đợi rỗng
+### State · Empty queue
 
-![Hàng đợi rỗng](coordinator/state-empty-review-queue.png)
+![Empty queue](coordinator/state-empty-review-queue.png)
 
-### Trạng thái · AI đang đọc
+### State · AI reading
 
-![AI đang đọc](coordinator/state-ai-reading.png)
+![AI reading](coordinator/state-ai-reading.png)
 
-### Trạng thái · AI lỗi
+### State · AI failed
 
-![AI lỗi ở một ca](coordinator/state-ai-failed.png)
+![AI failed on one case](coordinator/state-ai-failed.png)
 
-![AI hỏng cả loạt](coordinator/state-ai-down-review-queue.png)
+![AI failing for many messages](coordinator/state-ai-down-review-queue.png)
 
-### Trạng thái · Chưa có vị trí
+### State · No location
 
-![Chưa có vị trí](coordinator/state-no-location-command.png)
+![No location](coordinator/state-no-location-command.png)
 
-### Trạng thái · Mất kết nối
+### State · Disconnected
 
-![Mất kết nối ở Bản đồ](coordinator/state-offline-command.png)
+![Disconnected on the map](coordinator/state-offline-command.png)
 
-![Mất kết nối ở Duyệt ca](coordinator/state-offline-review.png)
+![Disconnected on case review](coordinator/state-offline-review.png)
 
-### Trạng thái · Xung đột
+### State · Conflict
 
-![Xung đột khi phân công](coordinator/state-conflict-assign.png)
+![Conflict on assignment](coordinator/state-conflict-assign.png)
 
-![Xung đột khi duyệt ca](coordinator/state-conflict-review.png)
+![Conflict on case review](coordinator/state-conflict-review.png)
 
-## Đội trưởng
+## Team leaders
 
-### SCR-30 · Nhiệm vụ của đội
+### SCR-30 · Team missions
 
 ![SCR-30](team-leader/scr-30-team-missions.png)
 
-### SCR-31 · Chi tiết nhiệm vụ
+### SCR-31 · Mission detail
 
 ![SCR-31](team-leader/scr-31-mission.png)
 
-### SCR-32 · Báo kết quả
+### SCR-32 · Report outcome
 
 ![SCR-32](team-leader/scr-32-report-result.png)
 
-### Trạng thái · Mất mạng
+### State · Offline
 
-![Mất mạng ở Chi tiết nhiệm vụ](team-leader/state-offline-mission.png)
+![Offline on mission detail](team-leader/state-offline-mission.png)
 
-![Mất mạng ở Nhiệm vụ của đội](team-leader/state-offline-team-missions.png)
+![Offline on team missions](team-leader/state-offline-team-missions.png)
 
-## Quản trị viên
+## Administrators
 
-Quản trị viên có toàn bộ quyền của điều phối viên, nên phần này chỉ có màn hình riêng và 2 ảnh minh họa.
+Administrators have all coordinator permissions, so this section has only their own screens and 2 illustrations.
 
-### SCR-50 · Đợt thiên tai, cấu hình
+### SCR-50 · Events, configuration
 
 ![SCR-50](admin/scr-50-events.png)
 
-### SCR-51 · Tài khoản
+### SCR-51 · Accounts
 
 ![SCR-51](admin/scr-51-users.png)
 
-![Mời người mới](admin/scr-51b-invite-user.png)
+![Invite someone](admin/scr-51b-invite-user.png)
 
-### SCR-52 · Đội cứu hộ
+### SCR-52 · Rescue teams
 
 ![SCR-52](admin/scr-52-teams.png)
 
-![Sửa đội](admin/scr-52b-edit-team.png)
+![Edit team](admin/scr-52b-edit-team.png)
 
-### SCR-53 · Chất lượng AI
+### SCR-53 · AI quality
 
 ![SCR-53](admin/scr-53-ai-quality.png)
 
-### SCR-54 · Nhật ký
+### SCR-54 · Audit log
 
 ![SCR-54](admin/scr-54-audit-log.png)
 
-### Bản đồ điều phối khi đăng nhập bằng quản trị viên
+### Command map when logged in as administrator
 
-![Bản đồ điều phối của quản trị viên](admin/admin-command.png)
+![Administrator's command map](admin/admin-command.png)
 
-### Dashboard khi đăng nhập bằng quản trị viên
+### Dashboard when logged in as administrator
 
-![Dashboard của quản trị viên](admin/admin-dashboard.png)
+![Administrator's dashboard](admin/admin-dashboard.png)
 
-## Dùng chung
+## Shared
 
-### SCR-04 · Đăng nhập
+### SCR-04 · Log in
 
 ![SCR-04](common/scr-04-login.png)
 
-### SCR-05 · Kích hoạt tài khoản
+### SCR-05 · Activate account
 
 ![SCR-05](common/scr-05-activate.png)
 
-### SCR-06 · Hồ sơ cá nhân
+### SCR-06 · Personal profile
 
 ![SCR-06](common/scr-06-profile.png)
 
-### SCR-90 · Không có quyền
+### SCR-90 · No permission
 
 ![SCR-90](common/scr-90-403.png)
 
-### SCR-91 · Không tìm thấy trang
+### SCR-91 · Page not found
 
 ![SCR-91](common/scr-91-404.png)

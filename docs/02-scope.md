@@ -1,104 +1,105 @@
-# 02 — Phạm vi V1 & Quy tắc nghiệp vụ
+# 02 — V1 Scope & Business Rules
 
-> Trạng thái thiết kế: **TARGET V1**
+> Design status: **TARGET V1**
 
-Tên sản phẩm (tạm thời): **SOSLink**.
+Product name (provisional): **SOSLink**.
 
-Ngôn ngữ giao diện: **tiếng Việt**, vì người dùng là người Việt và AI xử lý tin nhắn tiếng Việt. Riêng slide thuyết trình dùng tiếng Anh.
+Interface language: **Vietnamese**, because the users are Vietnamese and the AI processes Vietnamese messages. Documentation and presentation slides are in English.
 
-## 1. Phạm vi V1
+## 1. V1 scope
 
-SOSLink V1 phục vụ **một đơn vị điều phối** (một nhóm cứu hộ, một trung tâm tình nguyện) trong **một hoặc nhiều đợt thiên tai**, gồm:
+SOSLink V1 serves **one coordinating unit** (a rescue group, a volunteer centre) across **one or more disaster events**, and includes:
 
-- Tiếp nhận tin qua **form web công khai** và **tình nguyện viên dán tin** (văn bản hoặc ảnh chụp màn hình); Zalo OA nếu còn thời gian.
-- **AI trích xuất** thông tin, định vị địa chỉ, **đề xuất gộp tin trùng** và **đề xuất mức ưu tiên**.
-- Điều phối viên **duyệt ca**, phân công đội với gợi ý đội phù hợp.
-- Đội cứu hộ nhận nhiệm vụ và cập nhật kết quả trên điện thoại.
-- Người gửi tra cứu tình trạng bằng mã.
-- Cảnh báo ca quá hạn, dashboard, báo cáo sau sự kiện, đo chất lượng AI, nhật ký.
+- Receiving messages through a **public web form** and **volunteers pasting messages** (text or screenshots); Zalo OA if time allows.
+- **AI extraction**, geocoding, **duplicate suggestions** and **priority suggestions**.
+- Coordinators **review cases** and assign teams with team suggestions.
+- Rescue teams receive missions and report outcomes on their phones.
+- Senders look up status with a code.
+- Overdue alerts, dashboard, after-action report, AI quality measurement, audit log.
 
-## 2. Ngoài phạm vi
+## 2. Out of scope
 
-| Không làm ở V1 | Lý do |
+| Not in V1 | Reason |
 |---|---|
-| Tự động quét Facebook, nhóm Zalo | Rủi ro điều khoản nền tảng và dữ liệu cá nhân; đã có dự án làm phần này |
-| Thay thế tổng đài 112 | Form luôn nhắc gọi 112 nếu nguy hiểm tức thời |
-| Bản đồ công khai có thông tin người gặp nạn | Lộ dữ liệu cá nhân, dễ bị lợi dụng |
-| Dẫn đường theo tình trạng ngập thực tế | Không có dữ liệu đường ngập đáng tin cậy |
-| Quản lý hàng cứu trợ, kho, quyên góp | Bài toán khác, quá rộng |
-| Gọi điện và chuyển giọng nói thành văn bản, SMS | Ưu tiên sau V1 |
-| Tự train model AI | Dùng API mô hình có sẵn |
-| Ứng dụng mobile native | Web responsive, có hàng đợi khi mất mạng ở màn hình đội |
+| Automatically scanning Facebook and Zalo groups | Platform terms and personal data risks; other projects already do this |
+| Replacing the 112 hotline | The form always reminds people to call 112 in immediate danger |
+| Public map with information about people in danger | Exposes personal data, easy to abuse |
+| Routing around actual flooded roads | No reliable flooded-road data |
+| Managing relief goods, warehouses, donations | A different and much wider problem |
+| Phone calls with speech-to-text, SMS | Priority after V1 |
+| Training a custom AI model | Uses an existing model API |
+| Native mobile app | Responsive web with an offline queue on the team screens |
 
-## 3. Quy tắc nghiệp vụ
+## 3. Business rules
 
-Giá trị mặc định do `ADMIN` cấu hình. Các con số là **đề xuất ban đầu**, cần chỉnh theo góp ý của đội cứu hộ thật.
+Defaults are configured by `ADMIN`. The numbers are **initial proposals**, to be adjusted with feedback from real rescue teams.
 
-### 3.1 An toàn: nhóm quy tắc quan trọng nhất
+### 3.1 Safety: the most important rules
 
-| Mã | Quy tắc |
+| Code | Rule |
 |---|---|
-| BR01 | **Không tin nào bị mất:** tin gốc được lưu nguyên trước khi xử lý. Không xóa tin; chỉ đánh dấu. |
-| BR02 | **AI chỉ đề xuất:** AI không được tự phân công, đóng ca, hạ mức ưu tiên hoặc gộp ca. |
-| BR03 | **Khi nghi ngờ, ưu tiên cao hơn:** AI lỗi, thiếu dữ liệu hoặc độ tin cậy dưới 0,6 → ca nhận tối thiểu mức P2 và đánh dấu `CẦN NGƯỜI ĐỌC`. |
-| BR04 | **Dấu hiệu nguy hiểm chỉ nâng, không hạ:** bộ từ khóa (mái nhà, nước đang lên, trẻ sơ sinh, bất tỉnh…) chạy độc lập với AI và luôn có thể nâng mức ưu tiên. |
-| BR05 | **Tin gốc luôn hiển thị** cạnh kết quả AI ở mọi màn hình duyệt. |
-| BR06 | **Nội dung tin chỉ là dữ liệu:** câu lệnh nằm trong tin không được làm thay đổi hành vi AI; AI không có quyền thực hiện hành động. |
-| BR07 | **Hệ thống vẫn chạy khi AI hỏng:** tin vào hàng đợi đọc tay, không dừng tiếp nhận. |
+| BR01 | **No message is ever lost:** the original is saved intact before any processing. Messages are never deleted, only flagged. |
+| BR02 | **AI only suggests:** AI must not assign teams, close cases, lower priority or merge cases on its own. |
+| BR03 | **When in doubt, go higher:** AI failure, missing data or confidence below 0.6 → the case gets at least P2 and is flagged `CẦN NGƯỜI ĐỌC` (needs a human read). |
+| BR04 | **Danger signals only raise, never lower:** the keyword set (roof, rising water, newborn, unconscious…) runs independently of AI and can always raise priority. |
+| BR05 | **The original message is always shown** next to the AI result on every review screen. |
+| BR06 | **Message content is only data:** instructions inside a message must not change AI behaviour; AI has no permission to perform actions. |
+| BR07 | **The system keeps running when AI fails:** messages go to a manual reading queue; intake does not stop. |
 
-### 3.2 Mức ưu tiên
+### 3.2 Priority levels
 
-| Mức | Tên | Ví dụ | Hạn phân công (SLA) |
+| Level | Name | Examples | Assignment deadline (SLA) |
 |---|---|---|---|
-| **P1** | Nguy hiểm tính mạng tức thì | Trên mái nhà, nước đang lên; người bị thương nặng; trẻ sơ sinh mắc kẹt | 10 phút |
-| **P2** | Khẩn cấp | Bị cô lập, có người già, trẻ em; sắp hết nước uống, thuốc | 30 phút |
-| **P3** | Cần hỗ trợ | Cần nhu yếu phẩm, chưa nguy hiểm ngay | 2 giờ |
-| **P4** | Thông tin | Báo tình hình chung, hỏi thăm người thân | Không có |
+| **P1** | Immediate danger to life | On a roof with water rising; seriously injured; trapped newborn | 10 minutes |
+| **P2** | Urgent | Isolated, with elderly people or children; running out of water or medicine | 30 minutes |
+| **P3** | Needs support | Needs supplies, no immediate danger | 2 hours |
+| **P4** | Information | General situation reports, asking about relatives | None |
 
-### 3.3 Gộp tin và xác minh
+### 3.3 Merging and verification
 
-| Mã | Quy tắc |
+| Code | Rule |
 |---|---|
-| BR08 | **Mỗi ca gồm một hoặc nhiều tin.** Tin mới có điện thoại trùng, hoặc cách dưới 200 m và nội dung tương tự trong 24 giờ, sẽ được **đề xuất** gộp. |
-| BR09 | **Gộp do người xác nhận và hoàn tác được.** Sau khi gộp vẫn xem được từng tin gốc. Ca gộp lấy mức ưu tiên cao nhất. |
-| BR10 | **Tin mới vào ca đang xử lý** sẽ báo điều phối viên và đội, vì có thể chứa diễn biến mới. |
-| BR11 | **Trạng thái xác minh:** `CHƯA XÁC MINH` · `ĐÃ GỌI ĐƯỢC` · `KHÔNG LIÊN LẠC ĐƯỢC`. Ca chưa xác minh **vẫn được phân công** nếu là P1; không gọi được không phải là lý do bỏ qua. |
-| BR12 | **Tin có dấu hiệu cũ** (AI thấy mốc thời gian cũ) chỉ được gắn nhãn, không bị loại. |
-| BR13 | Chỉ `ADMIN` hoặc điều phối viên mới đóng được ca `KHÔNG XÁC THỰC`, và phải ghi lý do. |
+| BR08 | **Each case has one or more messages.** A new message with a matching phone number, or less than 200 m away with similar content within 24 hours, is **suggested** for merging. |
+| BR09 | **Merging is confirmed by a person and can be undone.** Each original message stays viewable after merging. The merged case takes the highest priority. |
+| BR10 | **A new message on a case in progress** notifies the coordinator and the team, because it may contain new developments. |
+| BR11 | **Verification states:** `CHƯA XÁC MINH` (unverified) · `ĐÃ GỌI ĐƯỢC` (reached) · `KHÔNG LIÊN LẠC ĐƯỢC` (unreachable). An unverified P1 case **can still be assigned**; being unreachable is not a reason to skip it. |
+| BR12 | **Messages that look old** (AI sees an old time reference) are only labelled, not removed. |
+| BR13 | Only `ADMIN` or a coordinator can close a case as `KHÔNG XÁC THỰC` (not verified), and must give a reason. |
 
-### 3.4 Điều phối
+### 3.4 Dispatch
 
-| Mã | Quy tắc |
+| Code | Rule |
 |---|---|
-| BR14 | **Chỉ con người phân công.** Hệ thống gợi ý theo khoảng cách đường chim bay, phương tiện và số nhiệm vụ đang làm. Gợi ý ghi rõ là không tính đến đường ngập. |
-| BR15 | Đội có **5 phút** để nhận nhiệm vụ. Quá hạn hoặc từ chối → ca quay lại hàng đợi và cảnh báo. |
-| BR16 | **Cảnh báo quá hạn:** quá SLA chưa có đội, hoặc đội không cập nhật sau **30 phút** → báo điều phối viên. |
-| BR17 | Mọi thao tác trên ca đều ghi vào dòng thời gian của ca: ai, lúc nào, làm gì. |
-| BR18 | Màn hình đội **lưu cập nhật khi mất mạng** và tự gửi lại khi có mạng. |
+| BR14 | **Only people assign.** The system suggests by straight-line distance, vehicle and number of active missions. Suggestions state clearly that flooded roads are not considered. |
+| BR15 | A team has **5 minutes** to accept a mission. Timeout or decline → the case returns to the queue and raises an alert. |
+| BR16 | **Overdue alerts:** past SLA with no team, or a team with no update for **30 minutes** → notify the coordinator. |
+| BR17 | Every action on a case is written to its timeline: who, when, what. |
+| BR18 | The team screen **saves updates while offline** and resends them when back online. |
 
-### 3.5 Dữ liệu cá nhân
+### 3.5 Personal data
 
-| Mã | Quy tắc |
+| Code | Rule |
 |---|---|
-| BR19 | Trang tra cứu công khai chỉ hiện trạng thái tổng quát, **không hiện** tên, điện thoại, địa chỉ. |
-| BR20 | `VOLUNTEER` chỉ xem được tin do mình nhập. `TEAM` chỉ xem được ca được giao, và chỉ trong thời gian thực hiện. |
-| BR21 | Dữ liệu cá nhân được **ẩn danh sau 90 ngày** kể từ khi sự kiện kết thúc. Số liệu thống kê được giữ lại. |
-| BR22 | Mọi lần xem số điện thoại, xuất dữ liệu đều ghi nhật ký. |
+| BR19 | The public lookup page shows only general status and **does not show** name, phone or address. |
+| BR20 | `VOLUNTEER` sees only messages they entered. `TEAM` sees only assigned cases, and only while the mission is running. |
+| BR21 | Personal data is **anonymised 90 days** after the event ends. Statistics are kept. |
+| BR22 | Every phone number view and data export is logged. |
 
-[Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15](https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Luat-Bao-ve-du-lieu-ca-nhan-625628.aspx) có hiệu lực từ 1/1/2026 và [có ngoại lệ cho tình thế nguy cấp để bảo vệ tính mạng](https://luatvietnam.vn/tin-van-ban-moi/5-truong-hop-xu-ly-du-lieu-ca-nhan-khong-can-su-dong-y-cua-chu-the-186-103746-article.html). **Nhóm chưa có tư vấn pháp lý**, nên cần đối chiếu nguyên văn Điều 19 trước khi triển khai thật.
+[Personal Data Protection Law No. 91/2025/QH15](https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Luat-Bao-ve-du-lieu-ca-nhan-625628.aspx) takes effect on 1/1/2026 and [has an exception for emergencies to protect life](https://luatvietnam.vn/tin-van-ban-moi/5-truong-hop-xu-ly-du-lieu-ca-nhan-khong-can-su-dong-y-cua-chu-the-186-103746-article.html). **I have no legal advice yet**, so the original text of Article 19 needs checking before any real deployment.
 
-## 4. Vòng đời của một ca
+## 4. Case lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> NEW: Tin vào, AI xử lý
     NEW --> TRIAGED: Điều phối viên duyệt
+    NEW --> INVALID: Không xác thực
     NEW --> MERGED: Gộp vào ca khác
     MERGED --> NEW: Hoàn tác gộp
     TRIAGED --> ASSIGNED: Phân công đội
-    ASSIGNED --> TRIAGED: Đội từ chối hoặc quá hạn
+    ASSIGNED --> TRIAGED: Đội từ chối, quá hạn hoặc hủy phân công
     ASSIGNED --> EN_ROUTE: Đội nhận và xuất phát
-    EN_ROUTE --> TRIAGED: Không tiếp cận được
+    EN_ROUTE --> TRIAGED: Không tiếp cận được hoặc hủy phân công
     EN_ROUTE --> RESOLVED: Đã cứu hoặc đã hỗ trợ
     TRIAGED --> RESOLVED: Đã có lực lượng khác xử lý
     TRIAGED --> INVALID: Không xác thực
@@ -107,17 +108,17 @@ stateDiagram-v2
     MERGED --> [*]
 ```
 
-| Trạng thái | Hiển thị | Ý nghĩa |
+| Status | Shown as | Meaning |
 |---|---|---|
-| `NEW` | Chờ duyệt | AI đã xử lý hoặc chờ người đọc |
-| `TRIAGED` | Chờ phân công | Đã duyệt, vào hàng đợi theo ưu tiên |
-| `ASSIGNED` | Chờ đội nhận | Đã giao, đang chờ đội xác nhận |
-| `EN_ROUTE` | Đang đến | Đội đã nhận và xuất phát |
-| `RESOLVED` | Đã xử lý | Có kết quả: số người được cứu, ghi chú |
-| `INVALID` | Không xác thực | Tin giả hoặc nhầm, có lý do |
-| `MERGED` | Đã gộp | Trỏ tới ca chính |
+| `NEW` | Chờ duyệt | AI has processed it, or it is waiting for a human read |
+| `TRIAGED` | Chờ phân công | Reviewed, in the priority queue |
+| `ASSIGNED` | Chờ đội nhận | Assigned, waiting for the team to confirm |
+| `EN_ROUTE` | Đang đến | Team has accepted and set off |
+| `RESOLVED` | Đã xử lý | Has an outcome: people rescued, notes |
+| `INVALID` | Không xác thực | Fake or mistaken, with a reason |
+| `MERGED` | Đã gộp | Points to the main case |
 
-## 5. Đầu ra AI
+## 5. AI output
 
 ```json
 {
@@ -136,31 +137,31 @@ stateDiagram-v2
 }
 ```
 
-Trường nào AI không chắc thì để `null`; **không được đoán** địa chỉ hay số điện thoại.
+Any field the AI is unsure about is `null`; it **must not guess** an address or phone number.
 
-## 6. Nguồn dữ liệu
+## 6. Data sources
 
-| Loại | Nguồn | Ghi chú |
+| Type | Source | Notes |
 |---|---|---|
-| Tin khi vận hành | Form web, tình nguyện viên dán tin, Zalo OA | Kênh hệ thống được phép nhận |
-| Bộ đánh giá | 100–200 bài công khai thu thập tay, xóa tên và số điện thoại | Gán nhãn thủ công |
-| Bộ demo | Tin giả lập do nhóm tạo, ghi rõ là giả lập | Có viết tắt, không dấu, tin trùng, tin giả, tin cũ |
-| Địa giới hành chính | Danh mục xã, phường sau sáp nhập | Phải dùng dữ liệu mới |
-| Bản đồ, định vị | OpenStreetMap hoặc Goong | **Rủi ro lớn nhất:** địa chỉ nông thôn rất mơ hồ, nên cho phép ghim tay trên bản đồ |
-| Đội cứu hộ | Dữ liệu mẫu | Thay bằng dữ liệu thật khi triển khai |
+| Messages in operation | Web form, volunteers pasting messages, Zalo OA | Channels the system is allowed to receive |
+| Evaluation set | 100–200 public posts collected by hand, names and phone numbers removed | Labelled by hand |
+| Demo set | Simulated messages I create, clearly marked as simulated | Includes abbreviations, missing diacritics, duplicates, fake and old messages |
+| Administrative units | List of communes and wards after the merger | Must use current data |
+| Maps, geocoding | OpenStreetMap or Goong | **Biggest risk:** rural addresses are very vague, so manual map pinning is allowed |
+| Rescue teams | Sample data | Replace with real data on deployment |
 
-## 7. Rủi ro chính
+## 7. Main risks
 
-| Rủi ro | Mức | Giảm thiểu |
+| Risk | Level | Mitigation |
 |---|---|---|
-| AI đánh giá thấp một ca nguy hiểm | Rất cao | BR02–BR05; đo recall P1; không tự hạ mức |
-| Địa chỉ sai khiến đội đi nhầm | Cao | Hiện độ tin cậy, tin gốc, ghim tay; gọi xác minh |
-| Không đội nào chịu nhập liệu khi đang cứu | Cao | Chỉ 2–3 nút lớn; điều phối viên cập nhật hộ qua điện thoại |
-| Mất mạng ở vùng lũ | Cao | Hàng đợi khi mất mạng; kênh liên lạc ngoài hệ thống vẫn là dự phòng |
-| Lộ thông tin người gặp nạn | Cao | BR19–BR22 |
-| Tin giả làm lãng phí lực lượng | Trung bình | Trạng thái xác minh, số người báo cùng ca |
-| Chưa có nhóm cứu hộ thật dùng thử | Trung bình | Phỏng vấn sớm, diễn tập bằng bộ tin phát lại |
+| AI underrates a dangerous case | Very high | BR02–BR05; measure P1 recall; no automatic lowering |
+| Wrong address sends a team astray | High | Show confidence and original message, manual pin, verification call |
+| No team is willing to enter data during a rescue | High | Only 2–3 large buttons; coordinator can update on their behalf by phone |
+| No network in flood zones | High | Offline queue; communication outside the system remains the backup |
+| Exposure of information about people in danger | High | BR19–BR22 |
+| Fake messages waste resources | Medium | Verification status, number of people reporting the same case |
+| No real rescue group trying it yet | Medium | Early interviews, drills with a replayed message set |
 
 ---
 
-**Liên quan:** [Research](01-research.md) · [Use cases](03-use-cases.md)
+**Related:** [Research](01-research.md) · [Use cases](03-use-cases.md)

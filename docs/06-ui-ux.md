@@ -1,143 +1,143 @@
 # 06 — UI/UX
 
-> Trạng thái thiết kế: **TARGET V1** · Mức độ: **prototype tĩnh** (chưa nối backend)
+> Design status: **TARGET V1** · Level: **sample interface** (not connected to a backend)
 >
-> Ảnh chụp từ prototype. Toàn bộ dữ liệu trong ảnh là **dữ liệu mẫu**. Đủ các màn hình và trạng thái, chia theo vai trò: [screenshots/README.md](screenshots/README.md).
+> All data in the images is **sample data**. The interface is in Vietnamese. All screens and states, by role: [screenshots/README.md](screenshots/README.md).
 
-## 1. Nguyên tắc thiết kế
+## 1. Design principles
 
-| # | Nguyên tắc | Áp dụng |
+| # | Principle | Applied as |
 |---|---|---|
-| 1 | **Thiết kế cho người đang hoảng loạn** | Form công khai làm được bằng một tay, chọn thay vì gõ, số 112 luôn ở đầu trang |
-| 2 | **Luôn thấy tin gốc** | Kết quả AI không bao giờ thay thế tin gốc; cả hai nằm cạnh nhau |
-| 3 | **AI nhìn là biết** | Mọi thứ AI tạo ra đều có viền tím, có độ tin cậy và lý do |
-| 4 | **Ca nguy hiểm tự nổi lên** | Hàng đợi sắp theo mức ưu tiên và thời gian chờ; ca quá hạn đổi màu |
-| 5 | **Không để mất việc khi mất mạng** | Hiển thị rõ khi dữ liệu cũ; form và màn hình đội lưu trên máy rồi tự gửi lại |
-| 6 | **Ít chữ, nút lớn ngoài hiện trường** | Màn hình đội dùng nút cao ≥ 56 px |
-| 7 | **Không chỉ dựa vào màu** | Mức ưu tiên luôn có chữ P1–P4; dùng được với người mù màu |
+| 1 | **Design for people in panic** | Public form usable with one hand, pick instead of type, 112 always at the top of the page |
+| 2 | **Always see the original message** | AI results never replace the original; both sit side by side |
+| 3 | **AI is recognisable at a glance** | Everything AI produces has a purple border, a confidence value and a reason |
+| 4 | **Dangerous cases surface on their own** | Queue sorted by priority and waiting time; overdue cases change colour |
+| 5 | **No work lost when offline** | Stale data is clearly marked; form and team screens save on the device and resend automatically |
+| 6 | **Few words, large buttons in the field** | Team screens use buttons at least 56 px tall |
+| 7 | **Not colour alone** | Priority always has the text P1–P4; usable by colour-blind people |
 
 ## 2. Design tokens
 
-### 2.1 Màu
+### 2.1 Colours
 
-| Token | Giá trị | Dùng cho |
+| Token | Value | Used for |
 |---|---|---|
-| `p1` | `#B91C1C` / nền `#FEE2E2` | Nguy hiểm tính mạng, quá hạn, nút Gửi tin |
-| `p2` | `#C2410C` / nền `#FFEDD5` | Khẩn cấp |
-| `p3` | `#A16207` / nền `#FEF9C3` | Cần hỗ trợ |
-| `p4` | `#4B5563` / nền `#E5E7EB` | Thông tin |
-| `primary` | `#1168BD` / nền `#E8F1FB` | Hành động chính, đội cứu hộ trên bản đồ |
-| `ai` | `#7A4FBF` / nền `#F3ECFD` | Dữ liệu do AI tạo |
-| `success` | `#047857` / nền `#D1FAE5` | Đã xử lý, đã kết nối |
-| `warning` | `#B45309` / nền `#FEF3C7` | Cần chú ý, chưa có vị trí, đang lưu máy |
+| `p1` | `#B91C1C` / background `#FEE2E2` | Danger to life, overdue, Send button |
+| `p2` | `#C2410C` / background `#FFEDD5` | Urgent |
+| `p3` | `#A16207` / background `#FEF9C3` | Needs support |
+| `p4` | `#4B5563` / background `#E5E7EB` | Information |
+| `primary` | `#1168BD` / background `#E8F1FB` | Main actions, rescue teams on the map |
+| `ai` | `#7A4FBF` / background `#F3ECFD` | AI-generated data |
+| `success` | `#047857` / background `#D1FAE5` | Handled, connected |
+| `warning` | `#B45309` / background `#FEF3C7` | Needs attention, no location, saving on device |
 
-### 2.2 Chữ và khoảng cách
+### 2.2 Type and spacing
 
-| Token | Giá trị |
+| Token | Value |
 |---|---|
-| Font | Font hệ thống của thiết bị: Segoe UI (Windows), San Francisco (Apple), Roboto (Android), dự phòng Arial; mã kỹ thuật dùng Consolas. Không tải font ngoài, để trang nhẹ khi mạng yếu và vẫn hiện đúng tiếng Việt khi mất mạng |
-| Cỡ chữ | 12 phụ · 13–14 nội dung · 16–18 tiêu đề · 22–28 số liệu |
-| Khoảng cách | Thang 4 px |
-| Vùng chạm trên điện thoại | ≥ 44 px; hành động chính của đội ≥ 56 px |
-| Breakpoint | `< 768 px` điện thoại · `≥ 1280 px` trung tâm điều phối |
+| Font | The device's system font: Segoe UI (Windows), San Francisco (Apple), Roboto (Android), Arial as fallback; technical codes use Consolas. No web fonts, so pages stay light on weak networks and still show Vietnamese correctly offline |
+| Text size | 12 secondary · 13–14 body · 16–18 headings · 22–28 figures |
+| Spacing | 4 px scale |
+| Touch target on phones | ≥ 44 px; team's main actions ≥ 56 px |
+| Breakpoints | `< 768 px` phone · `≥ 1280 px` command centre |
 
-### 2.3 Thành phần dùng chung
+### 2.3 Shared components
 
-| Thành phần | Ghi chú |
+| Component | Notes |
 |---|---|
-| Nhãn ưu tiên | Luôn gồm chữ P1–P4 và màu |
-| Thẻ ca | Mức, tóm tắt, vị trí, số người, thời gian còn lại theo hạn |
-| Ô dữ liệu AI | Viền tím; đổi về viền thường khi người đã sửa |
-| Ghim bản đồ | Tròn: ca; chữ nhật: đội |
-| Banner kết nối | Xanh: đang kết nối; đỏ: dữ liệu dừng cập nhật lúc HH:mm |
-| Modal xác nhận | Chỉ dùng cho phân công và đóng ca |
+| Priority badge | Always has the text P1–P4 and a colour |
+| Case card | Level, summary, location, number of people, time left to the deadline |
+| AI data field | Purple border; returns to a normal border once a person edits it |
+| Map pin | Round: case; rectangle: team |
+| Connection banner | Green: connected; red: data stopped updating at HH:mm |
+| Confirmation modal | Only for assigning and closing cases |
 
-## 3. Màn hình chính
+## 3. Main screens
 
-Các màn hình dưới đây bao phủ luồng chính: **gửi tin → nhập tin → duyệt → phân công → báo kết quả → báo cáo**.
+The screens below cover the main flow: **send → enter → review → assign → report outcome → report**.
 
-### 3.1 SCR-01 · Người dân gửi tin (điện thoại)
+### 3.1 SCR-01 · Resident sends a message (phone)
 
 <img src="screenshots/citizen/scr-01-sos-form.png" alt="SCR-01" width="360">
 
-- Số **112** ở đầu trang: SOSLink không thay thế kênh khẩn cấp chính thức.
-- Chỉ mô tả nơi ở là bắt buộc nếu không có GPS; số người và nhóm yếu thế chỉ cần bấm chọn.
-- Trang rất nhẹ cho mạng yếu; mất mạng thì giữ nội dung và cho gửi lại.
+- The number **112** at the top of the page: SOSLink does not replace the official emergency channel.
+- A place description is required only when there is no GPS; number of people and vulnerable groups are just tapped.
+- The page is very light for weak networks; when offline it keeps the content and allows resending.
 
-### 3.2 SCR-02 + SCR-03 · Đã gửi và tra cứu (điện thoại)
+### 3.2 SCR-02 + SCR-03 · Sent and lookup (phone)
 
 <img src="screenshots/citizen/scr-02-sos-sent.png" alt="SCR-02" width="360"> <img src="screenshots/citizen/scr-03-track.png" alt="SCR-03" width="360">
 
-- Trả lời đúng câu người gửi đang lo: "Tin của tôi có ai nhận chưa?" (P7).
-- Chỉ hiện tiến trình tổng quát, không hiện dữ liệu cá nhân, vì ai có mã đều xem được.
+- Answers what the sender is worried about: "Has anyone received my message?" (P7).
+- Shows general progress only, with no personal data, because anyone with the code can see it.
 
-### 3.3 SCR-10 · Tình nguyện viên nhập tin
+### 3.3 SCR-10 · Volunteer enters a message
 
 ![SCR-10](screenshots/volunteer/scr-10-intake.png)
 
-- Dán, bấm `Ctrl + Enter`, ô trống lại: tối ưu cho thao tác lặp liên tục.
-- AI xử lý ở nền, không bắt tình nguyện viên phải chờ.
-- Tình nguyện viên chỉ thấy tin của mình; menu chỉ có Nhập tin và Tin của tôi.
+- Paste, press `Ctrl + Enter`, the input clears: optimised for constant repetition.
+- AI processes in the background and never makes the volunteer wait.
+- Volunteers see only their own messages; the menu has only Nhập tin (Enter message) and Tin của tôi (My messages).
 
-### 3.4 SCR-20 · Bản đồ điều phối
+### 3.4 SCR-20 · Command map
 
 ![SCR-20](screenshots/coordinator/scr-20-command.png)
 
-| Vùng | Hành vi |
+| Area | Behaviour |
 |---|---|
-| Hàng đợi (trái) | Sắp theo ưu tiên rồi thời gian chờ; đếm ngược theo hạn; ca quá hạn nền đỏ |
-| Bản đồ (giữa) | Ghim ca và đội; bấm ghim để mở ca |
-| Cảnh báo, đội (phải) | Ca quá hạn, đội không cập nhật; trạng thái từng đội |
-| Thanh trên | Đợt đang chọn, số ca P1 chưa có đội, trạng thái kết nối |
+| Queue (left) | Sorted by priority then waiting time; countdown to the deadline; overdue cases have a red background |
+| Map (centre) | Pins for cases and teams; click a pin to open the case |
+| Alerts, teams (right) | Overdue cases, teams not updating; status of each team |
+| Top bar | Selected event, number of P1 cases with no team, connection status |
 
-Ca chưa có vị trí vẫn nằm trong hàng đợi và có bộ đếm riêng, để không biến mất chỉ vì không hiện được trên bản đồ.
+A case with no location stays in the queue and has its own counter, so it does not vanish just because it cannot be shown on the map.
 
-### 3.5 SCR-22 · Duyệt ca
+### 3.5 SCR-22 · Review case
 
 ![SCR-22](screenshots/coordinator/scr-22-review.png)
 
-- **Trái:** tin gốc, vị trí, ghi nhận xác minh. **Giữa:** kết quả AI viền tím, mức ưu tiên kèm lý do. **Phải:** ca có thể trùng.
-- AI chỉ đề xuất gộp, có nút So sánh và Bỏ qua.
-- Hạ mức ưu tiên bắt buộc ghi lý do; nâng mức không cần.
-- Giá trị người sửa được lưu để đo chất lượng AI.
+- **Left:** original message, location, verification record. **Centre:** AI result with purple border, priority with a reason. **Right:** possible duplicates.
+- AI only suggests merging, with Compare and Skip buttons.
+- Lowering priority requires a reason; raising does not.
+- Human edits are stored to measure AI quality.
 
-### 3.6 SCR-24 · Phân công đội
+### 3.6 SCR-24 · Assign team
 
 ![SCR-24](screenshots/coordinator/scr-24-assign-team.png)
 
-- Tối đa 3 gợi ý kèm phương tiện, khoảng cách, số nhiệm vụ đang làm.
-- **Cảnh báo rõ** rằng khoảng cách chưa tính đường ngập. Người điều phối vẫn là người quyết định.
+- Up to 3 suggestions with vehicle, distance and number of active missions.
+- **A clear warning** that distance does not account for flooded roads. The coordinator still decides.
 
-### 3.7 SCR-31 + SCR-32 · Đội cứu hộ (điện thoại)
+### 3.7 SCR-31 + SCR-32 · Rescue team (phone)
 
 <img src="screenshots/team-leader/scr-31-mission.png" alt="SCR-31" width="360"> <img src="screenshots/team-leader/scr-32-report-result.png" alt="SCR-32" width="360">
 
-- Thông tin quan trọng nhất ở trên cùng: số người, nhóm yếu thế, tình trạng.
-- Nút mở Google Maps và gọi điện; luôn thấy tin gốc.
-- Báo kết quả bằng nút lớn. Mất mạng thì báo đã lưu bao nhiêu cập nhật và sẽ gửi khi có mạng.
+- The most important information is on top: number of people, vulnerable groups, condition.
+- Buttons to open Google Maps and to call; the original message is always visible.
+- Outcomes are reported with large buttons. When offline, the screen reports how many updates are saved and that they will be sent once online.
 
-### 3.8 SCR-40 · Dashboard theo đợt
+### 3.8 SCR-40 · Event dashboard
 
 ![SCR-40](screenshots/coordinator/scr-40-dashboard.png)
 
-- Cho thấy hệ thống có đạt thời hạn không. Chất lượng AI xem riêng ở SCR-53.
-- Danh sách "Ca đang kẹt" nêu rõ vì sao từng ca bị kẹt: quá hạn, đội im lặng, sắp hết hạn.
+- Shows whether the system is meeting its deadlines. AI quality is on SCR-53.
+- The "Ca đang kẹt" (stuck cases) list says why each case is stuck: overdue, team silent, deadline close.
 
-## 4. Trạng thái màn hình
+## 4. Screen states
 
-Xem chi tiết tại [05-information-architecture.md](05-information-architecture.md#7-trạng-thái-màn-hình).
+Details in [05-information-architecture.md](05-information-architecture.md#7-screen-states).
 
-## 5. Khả năng truy cập
+## 5. Accessibility
 
-- Độ tương phản chữ và nền ≥ 4.5:1 (WCAG AA); các cặp màu cần kiểm tra lại bằng công cụ khi dựng giao diện thật.
-- Mọi thao tác ở trung tâm điều phối dùng được bằng bàn phím: `J`/`K` chuyển ca, `A` phân công, `Enter` duyệt.
-- Form công khai có nhãn thật, cỡ chữ ≥ 16 px trên điện thoại để không bị tự phóng to.
+- Text-to-background contrast ≥ 4.5:1 (WCAG AA); colour pairs need checking with a tool when building the real interface.
+- Every command-centre action works from the keyboard: `J`/`K` to change case, `A` to assign, `Enter` to approve.
+- The public form has real labels, and text ≥ 16 px on phones to avoid automatic zoom.
 
-## 6. Bước tiếp theo
+## 6. Next steps
 
-- Cho 2–3 người chưa biết sản phẩm thử gửi tin trên điện thoại, đo thời gian và lỗi.
-- Cho điều phối viên thật xem SCR-20 và SCR-22, hỏi có thiếu thông tin nào để ra quyết định không.
+- Have 2–3 people unfamiliar with the product try sending a message on a phone; measure time and errors.
+- Show SCR-20 and SCR-22 to real coordinators and ask whether any information is missing for making decisions.
 
 ---
 
-**Liên quan:** [Information architecture](05-information-architecture.md) · [User stories](04-user-stories.md)
+**Related:** [Information architecture](05-information-architecture.md) · [User stories](04-user-stories.md)

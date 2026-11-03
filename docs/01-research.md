@@ -1,71 +1,71 @@
-# 01 — Phân tích đề bài Top-down (Research)
+# 01 — Top-down Problem Analysis (Research)
 
-> Trạng thái thiết kế: **TARGET V1**
+> Design status: **TARGET V1**
 >
-> Phương pháp: đi từ **bối cảnh → khoảng trống → mục tiêu → năng lực → phân hệ → tính năng**.
+> Method: from **context → gap → goal → capabilities → modules → features**.
 >
-> **Mức độ bằng chứng:** tài liệu này dựa trên báo chí và nghiên cứu công khai. Nhóm **chưa phỏng vấn** điều phối viên hay đội cứu hộ thật, nên các điểm chưa có nguồn được ghi rõ là *giả thuyết*.
+> **Level of evidence:** this document is based on press coverage and public research. I **have not interviewed** real coordinators or rescue teams, so anything without a source is marked as a *hypothesis*.
 
 ---
 
-## 1. Bối cảnh
+## 1. Context
 
-### 1.1 Mức độ nghiêm trọng
+### 1.1 Severity
 
-| Sự kiện | Số liệu | Nguồn |
+| Event | Figures | Source |
 |---|---|---|
-| Bão Yagi, 9/2024 | 345 người chết và mất tích (323 chết, 22 mất tích), theo báo cáo của Chính phủ gửi Quốc hội, 10/2024 | [Báo Đầu tư](https://baodautu.vn/chinh-phu-bao-cao-quoc-hoi-tinh-hinh-thiet-hai-va-khac-phuc-hau-qua-bao-yagi-d228038.html) |
-| Mưa lũ cuối 11/2025 | Riêng Đắk Lắk có 113 người chết, trong đó 101 người do mưa lũ trực tiếp (UBND tỉnh, 19/12/2025) | [Tuổi Trẻ](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm) |
+| Typhoon Yagi, 9/2024 | 345 dead and missing (323 dead, 22 missing), per the Government's report to the National Assembly, 10/2024 | [Báo Đầu tư](https://baodautu.vn/chinh-phu-bao-cao-quoc-hoi-tinh-hinh-thiet-hai-va-khac-phuc-hau-qua-bao-yagi-d228038.html) |
+| Floods, late 11/2025 | 113 dead in Đắk Lắk alone, 101 of them directly from the floods (provincial People's Committee, 19/12/2025) | [Tuổi Trẻ](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm) |
 
-Các con số thay đổi theo thời điểm và phạm vi thống kê. Khi đưa vào slide, cần đối chiếu với báo cáo chính thức mới nhất.
+These figures vary with the date and scope of each count. Check them against the latest official report before putting them on a slide.
 
-### 1.2 Người dân cầu cứu qua mạng xã hội
+### 1.2 People call for help on social media
 
-- Khi nước dâng trong đêm, người dân [đăng tin cầu cứu trên Facebook và Zalo](https://plo.vn/lu-dang-trong-dem-nguoi-dan-quang-tri-len-mang-cau-cuu-post597642.html), có người [mắc kẹt trên mái nhà cùng con nhỏ](https://vietnamnet.vn/en/trapped-on-rooftops-families-plead-for-help-on-facebook-amid-sudden-floods-2464633.html).
-- Số lượng tăng đột biến trong thời gian ngắn: năm 2020, Zalo ghi nhận [hơn 10.000 lời kêu cứu trong 4 ngày](https://znews.vn/nhung-dem-thuc-trang-va-hon-10000-loi-keu-cuu-tren-zalo-post1149198.html). Trong bão Bualoi năm 2025, [khoảng 70 nghìn người báo đang gặp khó khăn](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html) trên Zalo.
-- Nghiên cứu quốc tế cũng ghi nhận lũ lớn tạo ra [nhiều yêu cầu cứu hộ cùng lúc, gây quá tải hệ thống ứng phó](https://par.nsf.gov/servlets/purl/10470798).
+- When water rises at night, people [post calls for help on Facebook and Zalo](https://plo.vn/lu-dang-trong-dem-nguoi-dan-quang-tri-len-mang-cau-cuu-post597642.html), some [trapped on rooftops with small children](https://vietnamnet.vn/en/trapped-on-rooftops-families-plead-for-help-on-facebook-amid-sudden-floods-2464633.html).
+- Volume spikes in a short time: in 2020, Zalo recorded [over 10,000 calls for help in 4 days](https://znews.vn/nhung-dem-thuc-trang-va-hon-10000-loi-keu-cuu-tren-zalo-post1149198.html). During Typhoon Bualoi in 2025, [about 70,000 people reported being in trouble](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html) on Zalo.
+- International research also finds that major floods create [many simultaneous rescue requests that overload the response system](https://par.nsf.gov/servlets/purl/10470798).
 
 ---
 
-## 2. Các giải pháp đã có
+## 2. Existing solutions
 
-**Bài toán này đã có người làm**, và đề tài phải trả lời được câu hỏi "khác gì những gì đã có".
+**Others already work on this problem**, so this project has to answer "how is it different from what exists".
 
-| Giải pháp | Làm được gì | Điều chưa thấy trong nguồn công khai |
+| Solution | What it does | What public sources do not show |
 |---|---|---|
-| [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) | Người dùng gửi vị trí và tình trạng, hiện chấm đỏ trên bản đồ; [có kết nối tổng đài 112](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html); [từ cuối 11/2025 có bản đồ](https://nongnghiepmoitruong.vn/zalo-dua-gan-1-ty-thong-bao-canh-bao-thien-tai-toi-nguoi-dan-d803703.html), lực lượng cứu hộ đánh dấu đã hỗ trợ thì chấm chuyển xanh | Chỉ nhận tin từ người bật tính năng; không xử lý bài đăng tự do |
-| [thongtincuuho.org](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) (2025) | Tự quét bài đăng và bình luận, AI nhận diện địa danh, gắn điểm lên bản đồ; [gần 3.000 người dùng trong 24 giờ](https://vtcnews.vn/hai-ban-tre-lap-website-tong-hop-hang-nghin-loi-keu-cuu-giua-mua-lu-ar970052.html) | Đội cứu hộ vẫn tự mở link gốc; bài báo không nói về gộp tin trùng, xác minh, phân công và đóng ca |
-| [cuuhomientrung.info](https://tuoitre.vn/ung-dung-cong-nghe-ho-tro-cuu-ho-lu-lut-tai-dia-chi-cuuhomientrung-info-20201022122411161.htm) (2020) | Hơn 2.000 tình nguyện viên tổng hợp dữ liệu, có đường dây nóng và 30 người trực | Phụ thuộc rất nhiều vào nhân lực; không rõ trạng thái từng ca được theo dõi thế nào |
-| [totomo.org, antoanmualu.org](https://www.thiennguyen.org/group/hoat-dong-thien-nguyen/discussion/421c968b-7058-4817-b0a4-3072eb8e312f) (2025) | Tổng hợp tin cầu cứu, nút gửi vị trí GPS | Nhóm chưa đánh giá sâu |
-| Tổng đài 112 | Kênh chính thức, trực 24/7 | Không thay thế được, và không phải đối thủ |
+| [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) | Users send their location and condition, shown as a red dot on a map; [connected to the 112 hotline](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html); [has a map since late 11/2025](https://nongnghiepmoitruong.vn/zalo-dua-gan-1-ty-thong-bao-canh-bao-thien-tai-toi-nguoi-dan-d803703.html), and the dot turns green when rescuers mark it as helped | Only receives messages from people who turn the feature on; does not process free-form posts |
+| [thongtincuuho.org](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) (2025) | Scans posts and comments, uses AI to recognise place names, pins points on a map; [nearly 3,000 users in 24 hours](https://vtcnews.vn/hai-ban-tre-lap-website-tong-hop-hang-nghin-loi-keu-cuu-giua-mua-lu-ar970052.html) | Rescue teams still open the original link themselves; the article does not mention merging duplicates, verification, assignment or closing cases |
+| [cuuhomientrung.info](https://tuoitre.vn/ung-dung-cong-nghe-ho-tro-cuu-ho-lu-lut-tai-dia-chi-cuuhomientrung-info-20201022122411161.htm) (2020) | Over 2,000 volunteers compile data, with a hotline and 30 people on duty | Depends heavily on manpower; unclear how each case's status is tracked |
+| [totomo.org, antoanmualu.org](https://www.thiennguyen.org/group/hoat-dong-thien-nguyen/discussion/421c968b-7058-4817-b0a4-3072eb8e312f) (2025) | Compile calls for help, with a button to send GPS location | Not evaluated in depth yet |
+| 112 hotline | Official channel, staffed 24/7 | Cannot be replaced, and is not a competitor |
 
-> **Giới hạn của bảng này:** "chưa thấy trong nguồn" **không có nghĩa** là các dự án đó không có tính năng. Nhóm không truy cập được thongtincuuho.org khi khảo sát, nên cần dùng thử trực tiếp và hỏi người vận hành trước khi khẳng định.
+> **Limit of this table:** "not shown in sources" **does not mean** those projects lack the feature. I could not access thongtincuuho.org during the survey, so these tools need hands-on testing, and their operators need asking, before making any claim.
 
-### Khoảng trống và hướng đi
+### Gap and direction
 
-Các giải pháp hiện có tập trung vào câu hỏi **"ai đang cần cứu và ở đâu"**: đưa điểm đỏ lên bản đồ. SOSLink tập trung vào phần tiếp theo:
+Existing solutions focus on **"who needs rescue, and where"**: putting red dots on a map. SOSLink focuses on what comes next:
 
-> **"Đã có ai đi cứu chưa? Ai đi? Xong chưa?"**
+> **"Has anyone gone yet? Who? Is it done?"**
 
-Nghĩa là biến một lượng lớn tin lộn xộn thành **danh sách ca đã gộp, đã ưu tiên, có người phụ trách và được theo dõi đến khi đóng**. SOSLink nên **bổ trợ** các bản đồ sẵn có, không cạnh tranh trực tiếp.
+That means turning a large volume of messy messages into **a list of cases that are merged, prioritised, owned by someone and tracked until closed**. SOSLink should **complement** existing maps, not compete with them directly.
 
 ---
 
-## 3. Các bên liên quan
+## 3. Stakeholders
 
-| Bên liên quan | Mục tiêu | Mối quan tâm |
+| Stakeholder | Goal | Concern |
 |---|---|---|
-| **Người gặp nạn và người thân** | Có người đến cứu | Tin của mình có ai nhận chưa, bao giờ có người đến |
-| **Tình nguyện viên trực tin** | Không bỏ sót tin nào | Quá nhiều tin, tin thiếu thông tin |
-| **Điều phối viên** | Dùng đúng đội cho đúng ca khẩn cấp nhất | Ca nào trước, đội nào đang rảnh, ca nào bị bỏ quên |
-| **Đội cứu hộ** | Đến đúng chỗ, an toàn | Địa chỉ chính xác, đừng đến nơi đã có người cứu |
-| **Trưởng nhóm / đơn vị vận hành** | Vận hành hiệu quả, có trách nhiệm | Số liệu, nhật ký, bảo vệ dữ liệu cá nhân |
+| **People in danger and their relatives** | Someone comes to rescue them | Has anyone received my message, and when will someone come |
+| **Volunteers on message duty** | No message is missed | Too many messages, messages with missing information |
+| **Coordinators** | Send the right team to the most urgent case | Which case first, which team is free, which case was forgotten |
+| **Rescue teams** | Reach the right place safely | Accurate address, not going where someone has already helped |
+| **Group leader / operating unit** | Run effectively and accountably | Figures, logs, personal data protection |
 
 ---
 
-## 4. Quy trình hiện tại (As-is)
+## 4. Current process (As-is)
 
-> Đây là **giả thuyết** dựng từ các bài báo, cần xác nhận khi phỏng vấn nhóm cứu hộ thật.
+> This is a **hypothesis** built from news articles, to be confirmed by interviewing real rescue groups.
 
 ```mermaid
 flowchart LR
@@ -77,61 +77,61 @@ flowchart LR
     F -. "Thường không báo lại" .-> C
 ```
 
-| Mã | Painpoint | Hậu quả | Bằng chứng |
+| Code | Pain point | Consequence | Evidence |
 |---|---|---|---|
-| P1 | Tin dạng văn bản tự do, viết tắt, thiếu địa chỉ hoặc số điện thoại | Mất thời gian đọc và gọi lại | Giả thuyết; nhóm thongtincuuho cho biết cứu hộ ["không đơn giản là đọc tin rồi đi giúp"](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) |
-| P2 | Lượng tin tăng đột biến khi lũ lên | Quá tải, bỏ sót | Có nguồn (mục 1.2) |
-| P3 | Một ca được nhiều người đăng lại | Nhiều đội đến một nơi, nơi khác không có ai | Giả thuyết |
-| P4 | Tin cũ được chia sẻ lại, tin chưa xác minh | Lãng phí lực lượng | Giả thuyết; [nghiên cứu](https://digitalcommons.odu.edu/emse_etds/235) xem xác minh là vấn đề then chốt |
-| P5 | Ưu tiên dựa vào cảm tính | Ca nguy hiểm có thể bị xử lý muộn | Giả thuyết |
-| P6 | Không biết ca nào đã được cứu | Không đóng được vòng, cứu trùng | Giả thuyết |
-| P7 | Người cầu cứu không biết tin đã được nhận chưa | Hoảng loạn, đăng lại nhiều lần (làm P3 nặng thêm) | Giả thuyết |
+| P1 | Free-form messages, abbreviations, missing address or phone number | Time lost reading and calling back | Hypothesis; the thongtincuuho team says rescue is ["not as simple as reading a message and going to help"](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) |
+| P2 | Message volume spikes when floods rise | Overload, missed messages | Sourced (section 1.2) |
+| P3 | One case is reposted by many people | Several teams go to one place, nobody goes elsewhere | Hypothesis |
+| P4 | Old messages reshared, unverified messages | Wasted resources | Hypothesis; [research](https://digitalcommons.odu.edu/emse_etds/235) treats verification as a key issue |
+| P5 | Prioritising by gut feeling | Dangerous cases may be handled late | Hypothesis |
+| P6 | Nobody knows which cases were rescued | The loop never closes, duplicate rescues | Hypothesis |
+| P7 | Senders do not know if their message was received | Panic, reposting (which worsens P3) | Hypothesis |
 
 ---
 
-## 5. Vì sao cần AI
+## 5. Why AI is needed
 
-Quy tắc cứng không đọc được tin như thế này (ví dụ do nhóm tự viết):
+Hard rules cannot read a message like this (an example I wrote myself):
 
 > *"cứu vs ạ, nhà e ở gần cầu Sông Ba thôn 3 hòa thịnh, nc lên tới mái r, có 2 cụ già vs bé 8 tháng, đt 09xx xx1234 goi ko dc thì gọi số chị e"*
 
-| Bước | AI làm được gì | Vì sao quy tắc không đủ |
+| Step | What AI can do | Why rules are not enough |
 |---|---|---|
-| Trích xuất | Địa chỉ, số người, nhóm yếu thế, mức nước, điện thoại | Viết tắt, không dấu, thứ tự tự do |
-| Đọc ảnh chụp màn hình | Lấy nội dung từ ảnh bài đăng | Ảnh, không phải văn bản |
-| Gộp tin trùng | So nghĩa hai tin có cùng là một ca | Cách viết khác nhau, địa chỉ mơ hồ |
-| Dấu hiệu khẩn cấp | Nhận ra "mái nhà", "bé 8 tháng", "nước đang lên" | Vô số cách diễn đạt |
-| Dấu hiệu tin cũ | Nhận ra mốc thời gian trong nội dung | Thời điểm đăng lại khác thời điểm xảy ra |
+| Extraction | Address, number of people, vulnerable groups, water level, phone | Abbreviations, missing diacritics, free word order |
+| Reading screenshots | Gets the content from an image of a post | It is an image, not text |
+| Merging duplicates | Compares whether two messages mean the same case | Different wording, vague addresses |
+| Urgency signals | Recognises "mái nhà" (roof), "bé 8 tháng" (8-month-old baby), "nước đang lên" (water rising) | Endless ways of phrasing |
+| Old-message signals | Recognises time references in the content | Repost time differs from event time |
 
-**Tính khả thi đã có căn cứ:** mô hình BERT [VictimFinder](https://aag-amarchive.secure-platform.com:443/a/solicitations/13/sessiongallery/1303/application/1987) đạt F1 0,919 khi nhận diện tin cầu cứu trong bão Harvey, trên 3.191 tweet tiếng Anh đã gán nhãn. Con số này **không áp dụng trực tiếp** cho tiếng Việt, nên nhóm phải tự đo (mục 9).
+**Feasibility has a basis:** the BERT model [VictimFinder](https://aag-amarchive.secure-platform.com:443/a/solicitations/13/sessiongallery/1303/application/1987) reached F1 0.919 at identifying calls for help during Hurricane Harvey, on 3,191 labelled English tweets. This figure **does not apply directly** to Vietnamese, so I have to measure it myself (section 9).
 
-**Không train model riêng:** dùng API mô hình đa phương thức có sẵn, bắt trả về JSON theo schema cố định.
+**No custom model training:** use an existing multimodal model API and require JSON output in a fixed schema.
 
-**AI không được tự quyết:** đây là bối cảnh liên quan đến tính mạng. AI chỉ chuẩn bị và đề xuất; con người phân công và đóng ca (xem [02-scope.md](02-scope.md)).
+**AI must not decide on its own:** lives are at stake. AI only prepares and suggests; people assign teams and close cases (see [02-scope.md](02-scope.md)).
 
 ---
 
-## 6. Phân rã Top-down
+## 6. Top-down decomposition
 
-### 6.1 Mục tiêu sản phẩm
+### 6.1 Product goal
 
-> **"Trong đợt lũ, không một lời kêu cứu nào bị bỏ sót, và ca nguy hiểm nhất được xử lý trước."**
+> **"During a flood, no call for help is missed, and the most dangerous case is handled first."**
 
-### 6.2 Năng lực → Phân hệ
+### 6.2 Capabilities → Modules
 
-| Mã | Năng lực | Giải quyết | Phân hệ |
+| Code | Capability | Solves | Module |
 |---|---|---|---|
-| C1 | Tiếp nhận tin từ nhiều kênh | P2, P7 | M2 Tiếp nhận |
-| C2 | Chuyển tin lộn xộn thành dữ liệu có cấu trúc | P1 | M3 Xử lý AI |
-| C3 | Gộp tin trùng thành một ca | P3 | M3 Xử lý AI, M4 Duyệt ca |
-| C4 | Ưu tiên và xác minh | P4, P5 | M3 Xử lý AI, M4 Duyệt ca |
-| C5 | Phân công và theo dõi đến khi đóng ca | P6 | M5 Điều phối, M6 Đội cứu hộ |
-| C6 | Phản hồi cho người cầu cứu | P7 | M2 Tiếp nhận |
-| C7 | Quản trị, trách nhiệm, học sau sự kiện | Tất cả | M1 Tài khoản, M7 Báo cáo, M8 Quản trị |
+| C1 | Receive messages from many channels | P2, P7 | M2 Intake |
+| C2 | Turn messy messages into structured data | P1 | M3 AI processing |
+| C3 | Merge duplicate messages into one case | P3 | M3 AI processing, M4 Case review |
+| C4 | Prioritise and verify | P4, P5 | M3 AI processing, M4 Case review |
+| C5 | Assign and track until the case closes | P6 | M5 Dispatch, M6 Rescue teams |
+| C6 | Give feedback to the person calling for help | P7 | M2 Intake |
+| C7 | Administration, accountability, post-event learning | All | M1 Accounts, M7 Reports, M8 Administration |
 
 ---
 
-## 7. Quy trình mục tiêu (To-be)
+## 7. Target process (To-be)
 
 ```mermaid
 flowchart TB
@@ -150,47 +150,47 @@ flowchart TB
 
 ---
 
-## 8. Dữ liệu
+## 8. Data
 
-Chi tiết nguồn dữ liệu: [02-scope.md](02-scope.md#6-nguồn-dữ-liệu).
+Data source details: [02-scope.md](02-scope.md#6-data-sources).
 
-| Mục đích | Nguồn |
+| Purpose | Source |
 |---|---|
-| Tin đầu vào khi vận hành | Form web, tình nguyện viên dán tin, Zalo OA |
-| Đo độ chính xác | 100–200 bài công khai đã ẩn danh + tin giả lập, gán nhãn tay |
-| Demo | Phát lại bộ tin trên theo dòng thời gian |
+| Incoming messages in operation | Web form, volunteers pasting messages, Zalo OA |
+| Measuring accuracy | 100–200 anonymised public posts + simulated messages, labelled by hand |
+| Demo | Replay the message set along a timeline |
 
-## 9. Giả định cần kiểm chứng
+## 9. Assumptions to validate
 
-| # | Giả định | Cách kiểm chứng | Tiêu chí xác nhận (đề xuất) |
+| # | Assumption | How to validate | Confirmation criterion (proposed) |
 |---|---|---|---|
-| A1 | Nhóm cứu hộ đang điều phối bằng nhóm chat, bảng tính | Phỏng vấn 3–5 nhóm ở miền Trung | ≥ 3 nhóm xác nhận |
-| A2 | Tin trùng và cứu trùng thật sự xảy ra | Hỏi ví dụ cụ thể, xem mẫu tin | Có ví dụ thật |
-| A3 | AI trích đúng thông tin trên tin tiếng Việt thực tế | Đo trên bộ 100–200 tin | Điện thoại ≥ 95%, địa chỉ ≥ 80%, số người ≥ 85% |
-| A4 | AI không bỏ sót ca nguy hiểm | Đo recall của nhóm P1 | ≥ 95% |
-| A5 | Nhóm cứu hộ sẵn sàng dùng công cụ mới giữa lúc khẩn cấp | Cho dùng thử bản demo | ≥ 2 nhóm sẵn sàng thử mùa lũ tới |
+| A1 | Rescue groups coordinate with group chats and spreadsheets | Interview 3–5 groups in Central Vietnam | ≥ 3 groups confirm |
+| A2 | Duplicate messages and duplicate rescues really happen | Ask for concrete examples, look at sample messages | Real examples exist |
+| A3 | AI extracts correctly from real Vietnamese messages | Measure on the 100–200 message set | Phone ≥ 95%, address ≥ 80%, number of people ≥ 85% |
+| A4 | AI does not miss dangerous cases | Measure P1 recall | ≥ 95% |
+| A5 | Rescue groups are willing to use a new tool during an emergency | Let them try the demo | ≥ 2 groups willing to try next flood season |
 
-**Câu hỏi phỏng vấn gợi ý:**
-1. Đợt lũ gần nhất, nhóm nhận tin từ đâu, mỗi giờ khoảng bao nhiêu tin?
-2. Nhóm ghi lại và phân công bằng công cụ gì?
-3. Đã từng có hai đội đến cùng một nơi, hoặc ca nào bị bỏ sót chưa? Vì sao?
-4. Làm sao biết một ca đã được cứu?
-5. Thông tin nào hay thiếu nhất khi đi cứu?
-6. Có dùng thongtincuuho.org, Zalo SOS không? Còn thiếu gì?
+**Suggested interview questions:**
+1. In the latest flood, where did your group receive messages from, and about how many per hour?
+2. What tool does the group use to record and assign?
+3. Have two teams ever gone to the same place, or has a case been missed? Why?
+4. How do you know a case has been rescued?
+5. What information is most often missing when going on a rescue?
+6. Do you use thongtincuuho.org or Zalo SOS? What is still missing?
 
-## 10. Chỉ số thành công
+## 10. Success metrics
 
-Đây là **mục tiêu đề xuất**, chưa có số đo hiện trạng.
+These are **proposed targets**; there are no baseline measurements yet.
 
-| Chỉ số | Mục tiêu V1 | Cách đo |
+| Metric | V1 target | How measured |
 |---|---|---|
-| Thời gian từ tin vào đến sẵn sàng duyệt | ≤ 30 giây | Log hệ thống |
-| Thời gian duyệt một ca so với làm tay | Giảm ≥ 50% | Thử với cùng bộ tin |
-| Recall ca nguy hiểm (mức P1) | ≥ 95% | Bộ tin đã gán nhãn |
-| Độ chính xác gợi ý gộp trùng | ≥ 85% | Bộ tin đã gán nhãn |
-| Tin bị mất | 0 | Đối chiếu tin vào với ca |
-| Ca chưa có trạng thái cuối khi kết thúc diễn tập | 0 | Báo cáo |
+| Time from message in to ready for review | ≤ 30 seconds | System logs |
+| Time to review a case compared with doing it by hand | ≥ 50% less | Test with the same message set |
+| Recall of dangerous cases (P1) | ≥ 95% | Labelled message set |
+| Precision of duplicate suggestions | ≥ 85% | Labelled message set |
+| Lost messages | 0 | Compare incoming messages with cases |
+| Cases with no final status when a drill ends | 0 | Report |
 
 ---
 
-**Liên quan:** [Phạm vi & quy tắc](02-scope.md) · [Use cases](03-use-cases.md) · [User stories](04-user-stories.md)
+**Related:** [Scope & rules](02-scope.md) · [Use cases](03-use-cases.md) · [User stories](04-user-stories.md)

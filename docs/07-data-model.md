@@ -1,133 +1,133 @@
-# 07 — Mô hình dữ liệu (Database)
+# 07 — Data Model (Database)
 
-> Trạng thái thiết kế: **TARGET V1** · CSDL: **PostgreSQL**
+> Design status: **TARGET V1** · Database: **PostgreSQL**
 >
-> Nguồn chính: [database/soslink.dbml](database/soslink.dbml). Xem sơ đồ: mở [dbdiagram.io](https://dbdiagram.io) → *Import* → *From DBML* → dán nội dung file.
+> Main source: [database/soslink.dbml](database/soslink.dbml). To see the diagram: open [dbdiagram.io](https://dbdiagram.io) → *Import* → *From DBML* → paste the file contents.
 
-## 1. Quy ước
+## 1. Conventions
 
-| Quy ước | Áp dụng |
+| Convention | Applied as |
 |---|---|
-| Khóa chính | `uuid`; `case_events`, `audit_logs` dùng `bigserial` vì ghi nhiều |
-| Thời gian | `timestamptz`, lưu UTC, hiển thị giờ Việt Nam |
-| Xóa dữ liệu | Không xóa nghiệp vụ; ẩn danh theo đợt sau 90 ngày |
-| Token | Chỉ lưu hash; IP cũng chỉ lưu hash |
-| Mã công khai | `tracking_code` ngẫu nhiên, không suy ra được từ khóa nội bộ |
+| Primary key | `uuid`; `case_events`, `audit_logs` use `bigserial` because they are write-heavy |
+| Time | `timestamptz`, stored in UTC, shown in Vietnam time |
+| Deleting data | Business data is not deleted; anonymised per event after 90 days |
+| Tokens | Only hashes stored; IP addresses too |
+| Public code | `tracking_code` is random and cannot be derived from internal keys |
 
-## 2. Bảng theo phân hệ
+## 2. Tables by module
 
-| Phân hệ | Bảng | Vai trò |
+| Module | Tables | Role |
 |---|---|---|
-| Tài khoản | `users`, `invitations` | Tài khoản 4 vai trò, link mời |
-| Cấu hình | `disaster_events`, `danger_keywords`, `admin_units` | Đợt thiên tai và thời hạn, từ khóa nguy hiểm, địa giới |
-| Tiếp nhận | `reports`, `report_attachments` | **Tin gốc** và ảnh đính kèm |
-| Xử lý AI | `ai_extractions` | Mỗi lần gọi AI: kết quả gốc, độ tin cậy, chi phí |
-| Ca | `cases`, `merge_suggestions`, `verification_logs`, `case_events` | Ca đã gộp, đề xuất trùng, xác minh, dòng thời gian |
-| Đo AI | `case_field_corrections` | Giá trị AI và giá trị người chốt |
-| Điều phối | `teams`, `assignments`, `team_updates` | Đội, phân công, cập nhật có khả năng gửi lại |
-| Hệ thống | `alerts`, `audit_logs`, `job_runs` | Cảnh báo, nhật ký, job |
+| Accounts | `users`, `invitations` | Accounts with 4 roles, invitation links |
+| Configuration | `disaster_events`, `danger_keywords`, `admin_units` | Events and deadlines, danger keywords, administrative units |
+| Intake | `reports`, `report_attachments` | **Original messages** and attached images |
+| AI processing | `ai_extractions` | Each AI call: raw result, confidence, cost |
+| Cases | `cases`, `merge_suggestions`, `verification_logs`, `case_events` | Merged cases, duplicate suggestions, verification, timeline |
+| AI measurement | `case_field_corrections` | AI values and final human values |
+| Dispatch | `teams`, `assignments`, `team_updates` | Teams, assignments, resendable updates |
+| System | `alerts`, `audit_logs`, `job_runs` | Alerts, audit log, jobs |
 
-## 3. Quan hệ chính
+## 3. Main relationships
 
 ```text
 disaster_events 1 ── n reports n ── 0..1 cases
 reports 1 ── n report_attachments
 reports 1 ── n ai_extractions
 cases 1 ── n merge_suggestions, verification_logs, case_events, case_field_corrections
-cases 0..1 ── n cases                  (merged_into_id: ca phụ trỏ tới ca chính)
+cases 0..1 ── n cases                  (merged_into_id: secondary case points to main case)
 cases 1 ── n assignments n ── 1 teams
 assignments 1 ── n team_updates
 cases 1 ── n alerts
-teams 1 ── n users                     (đội trưởng, thành viên có tài khoản)
+teams 1 ── n users                     (team leader, members with accounts)
 ```
 
-## 4. Thiết kế đáng chú ý
+## 4. Notable design points
 
-### 4.1 Tách `reports` và `cases`
+### 4.1 Separating `reports` and `cases`
 
-Đây là quyết định quan trọng nhất của mô hình:
+This is the most important decision in the model:
 
-- **`reports`** là **sự thật gốc**: nguyên văn tin, ai gửi, kênh nào. Không bị sửa.
-- **`cases`** là **cách hiểu đã chuẩn hóa**: một tình huống cần xử lý, tổng hợp từ một hoặc nhiều tin.
+- **`reports`** is the **original truth**: the message verbatim, who sent it, which channel. It is never edited.
+- **`cases`** is the **normalised understanding**: one situation to handle, compiled from one or more messages.
 
-Nhờ tách như vậy, gộp tin chỉ là đổi `reports.case_id` và đặt `merged_into_id` trên ca phụ. Việc này **hoàn tác được và không làm mất dữ liệu** (BR01, BR09).
+Because of this split, merging only changes `reports.case_id` and sets `merged_into_id` on the secondary case. It **can be undone and loses no data** (BR01, BR09).
 
-### 4.2 Lưu tin trước, xử lý sau
+### 4.2 Save first, process later
 
 ```text
-1. INSERT reports (ai_status = PENDING)        ← luôn thành công nếu database còn chạy
+1. INSERT reports (ai_status = PENDING)        ← always succeeds while the database is up
 2. INSERT cases (priority = P2, needs_human_read = true)
-3. Trả mã tra cứu ngay cho người gửi
-4. Worker gọi AI, ghi ai_extractions, cập nhật ca
+3. Return the tracking code to the sender at once
+4. Worker calls AI, writes ai_extractions, updates the case
 ```
 
-Ca được tạo ngay ở mức an toàn **P2, cần người đọc**. AI chạy xong mới cập nhật. Vì vậy, AI chậm hoặc hỏng thì tin vẫn xuất hiện trong hàng đợi (BR03, BR07).
+A case is created right away at the safe level **P2, needs a human read**. Only when AI finishes is it updated. So if AI is slow or down, the message still appears in the queue (BR03, BR07).
 
-### 4.3 Ưu tiên chỉ tăng khi tự động
+### 4.3 Priority only rises automatically
 
-Khi AI xong, mức của ca được tính:
+When AI finishes, the case's level is computed as:
 
 ```text
-mức = cao hơn của (đề xuất của AI, mức từ danger_keywords)
-nếu độ tin cậy < 0,6 hoặc AI lỗi: mức tối thiểu là P2, needs_human_read = true
+level = the higher of (AI suggestion, level from danger_keywords)
+if confidence < 0.6 or AI failed: level is at least P2, needs_human_read = true
 ```
 
-Khi có tin mới gộp vào, mức ca lấy **mức cao nhất**. Chỉ người mới hạ được, và phải có lý do (ghi vào `case_events`).
+When a new message merges in, the case takes the **highest level**. Only a person can lower it, and must give a reason (written to `case_events`).
 
-### 4.4 Chống phân công trùng
+### 4.4 Preventing duplicate assignment
 
-- `cases.version` dùng khóa lạc quan.
-- Partial unique index: một `case_id` chỉ có một phân công ở `OFFERED`, `ACCEPTED` hoặc `EN_ROUTE`.
+- `cases.version` uses optimistic locking.
+- Partial unique index: one `case_id` has only one assignment in `OFFERED`, `ACCEPTED` or `EN_ROUTE`.
 
-### 4.5 Cập nhật khi mất mạng
+### 4.5 Updates while offline
 
-Máy đội tự sinh `team_updates.client_update_id`. Gửi lại nhiều lần vẫn chỉ tạo một bản ghi. `occurred_at` lưu thời điểm thật trên máy, `received_at` lưu lúc server nhận.
+The team's device generates `team_updates.client_update_id` itself. Resending many times creates only one record. `occurred_at` stores the real time on the device, `received_at` the time the server received it.
 
-### 4.6 Ràng buộc
+### 4.6 Constraints
 
-| Ràng buộc | Mục đích |
+| Constraint | Purpose |
 |---|---|
-| `reports`: CHECK có ít nhất một trong `raw_text`, ảnh đính kèm hoặc GPS | Không có tin rỗng (kiểm ở ứng dụng với ảnh) |
-| `assignments`: partial unique `case_id` khi đang hiệu lực | Một ca một đội tại một thời điểm |
-| `alerts`: partial unique `(case_id, type)` khi chưa xác nhận | Không báo lặp |
-| `users`: CHECK `role <> 'TEAM' OR team_id IS NOT NULL` | Đội trưởng phải thuộc đội |
+| `reports`: CHECK at least one of `raw_text`, attached image or GPS | No empty messages (checked in the application for images) |
+| `assignments`: partial unique `case_id` while active | One case, one team at a time |
+| `alerts`: partial unique `(case_id, type)` while unacknowledged | No repeat alerts |
+| `users`: CHECK `role <> 'TEAM' OR team_id IS NOT NULL` | A team leader must belong to a team |
 
-### 4.7 Index cho truy vấn chính
+### 4.7 Indexes for the main queries
 
-| Truy vấn | Index |
+| Query | Index |
 |---|---|
-| Hàng đợi điều phối | `cases (event_id, status, priority, created_at)` |
-| Job cảnh báo quá hạn | `cases (status, sla_due_at)`, `assignments (status, accept_due_at)` |
-| Tìm ca trùng theo điện thoại | `reports (contact_phone)` |
-| Tìm ca trùng theo khoảng cách | `cases (lat, lng)`; nên dùng index GiST của PostGIS khi triển khai |
-| Dòng thời gian | `case_events (case_id, created_at)` |
+| Command queue | `cases (event_id, status, priority, created_at)` |
+| Overdue alert job | `cases (status, sla_due_at)`, `assignments (status, accept_due_at)` |
+| Duplicates by phone | `reports (contact_phone)` |
+| Duplicates by distance | `cases (lat, lng)`; a PostGIS GiST index is preferable on deployment |
+| Timeline | `case_events (case_id, created_at)` |
 
-## 5. Ẩn danh dữ liệu
+## 5. Data anonymisation
 
-Khi `closed_at` quá 90 ngày, job `ANONYMIZE` thực hiện:
+When `closed_at` is more than 90 days old, the `ANONYMIZE` job does the following:
 
-| Bảng | Xử lý |
+| Table | Handling |
 |---|---|
-| `reports` | Xóa `raw_text`, `contact_phone`, `gps_*`, `source_url`, `ip_hash`; xóa ảnh |
-| `ai_extractions` | Xóa `output` |
-| `cases` | Xóa `address_text`, `phones`, `summary`; làm tròn tọa độ cấp xã |
-| `case_field_corrections` | Xóa `ai_value`, `final_value` nếu chứa địa chỉ, điện thoại |
-| `case_events`, `verification_logs` | Xóa `note`, giá trị chứa thông tin cá nhân |
+| `reports` | Clears `raw_text`, `contact_phone`, `gps_*`, `source_url`, `ip_hash`; deletes images |
+| `ai_extractions` | Clears `output` |
+| `cases` | Clears `address_text`, `phones`, `summary`; rounds coordinates to commune level |
+| `case_field_corrections` | Clears `ai_value`, `final_value` if they contain addresses or phone numbers |
+| `case_events`, `verification_logs` | Clears `note` and values containing personal information |
 
-Giữ lại: số ca, mức ưu tiên, thời gian phản hồi, kết quả, chỉ số chất lượng AI.
+Kept: number of cases, priority levels, response times, outcomes, AI quality metrics.
 
-## 6. Ánh xạ Use case → Bảng
+## 6. Use case → Table mapping
 
-| Use case | Bảng ghi chính |
+| Use case | Main tables written |
 |---|---|
-| UC03, UC05, UC06 Tiếp nhận | `reports`, `report_attachments`, `cases` |
-| UC07–UC10 Xử lý AI | `ai_extractions`, `cases`, `merge_suggestions` |
-| UC11–UC13 Duyệt | `cases`, `case_field_corrections`, `verification_logs`, `case_events` |
-| UC15–UC16 Phân công, cảnh báo | `assignments`, `alerts`, `job_runs` |
-| UC17–UC18 Đội | `assignments`, `team_updates`, `cases` |
-| UC20 Chất lượng AI | `ai_extractions`, `case_field_corrections`, `merge_suggestions` |
-| UC24 Nhật ký, ẩn danh | `audit_logs`, `job_runs` |
+| UC03, UC05, UC06 Intake | `reports`, `report_attachments`, `cases` |
+| UC07–UC10 AI processing | `ai_extractions`, `cases`, `merge_suggestions` |
+| UC11–UC13 Review | `cases`, `case_field_corrections`, `verification_logs`, `case_events` |
+| UC15–UC16 Assignment, alerts | `assignments`, `alerts`, `job_runs` |
+| UC17–UC18 Teams | `assignments`, `team_updates`, `cases` |
+| UC20 AI quality | `ai_extractions`, `case_field_corrections`, `merge_suggestions` |
+| UC24 Audit log, anonymisation | `audit_logs`, `job_runs` |
 
 ---
 
-**Liên quan:** [Phạm vi & quy tắc](02-scope.md) · [User stories](04-user-stories.md)
+**Related:** [Scope & rules](02-scope.md) · [User stories](04-user-stories.md)

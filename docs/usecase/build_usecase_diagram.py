@@ -1,7 +1,7 @@
-"""Vẽ Use Case Diagram tổng quát (chuẩn UML) của SOSLink dưới dạng SVG.
+"""Draws the overall UML use case diagram of SOSLink as an SVG.
 
-Chạy: python docs/usecase/build_usecase_diagram.py
-Kết quả: docs/usecase/ucd-overview.svg
+Run: python docs/usecase/build_usecase_diagram.py
+Output: docs/usecase/ucd-overview.svg
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ C = {
     "line": "#475569", "rel": "#7a4fbf",
 }
 
-# (mã, nhãn, có AI) — thứ tự từ trên xuống để đường nối hai bên ít chồng nhau
+# (code, label, uses AI); top-to-bottom order keeps the lines on both sides from crossing much
 UCS = [
     ("SEND", "Gửi tin cầu cứu", False),
     ("TRACK", "Tra cứu tình trạng", False),
@@ -72,7 +72,7 @@ def build():
         return top + r * row + oh / 2
 
     lax, rax = margin + 90, bx + bw + right_zone / 2
-    # (tên, x, y của tay, cạnh, use case)
+    # (name, x, y of the arms, side, use cases)
     people = [
         ("Người dân", lax, ry(0.6), "L", ["SEND", "TRACK"]),
         ("Tình nguyện viên", lax, ry(3.2), "L", ["PASTE"]),
@@ -128,4 +128,4 @@ def build():
 
 if __name__ == "__main__":
     build()
-    print("Đã tạo ucd-overview.svg")
+    print("Created ucd-overview.svg")

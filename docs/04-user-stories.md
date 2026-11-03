@@ -199,7 +199,7 @@ Scenario: Không tiếp cận được
 
 ### M7–M8 — Báo cáo, Quản trị
 
-- **AC-US19:** Theo đợt: tổng số tin, số ca, tỷ lệ trùng, số ca theo mức và trạng thái, thời gian từ tin đến phân công và từ tin đến xử lý, số người được cứu, ca chưa đóng. Xuất Excel; dữ liệu xuất không chứa điện thoại trừ khi `ADMIN` chọn và có ghi nhật ký.
+- **AC-US19:** Theo đợt: tổng số tin, số ca, tỷ lệ trùng, số ca theo mức và trạng thái, thời gian từ tin đến phân công và từ tin đến xử lý, số người được cứu, ca chưa đóng. Chỉ `ADMIN` xuất được Excel; dữ liệu xuất không chứa điện thoại trừ khi `ADMIN` chọn, và có ghi nhật ký.
 - **AC-US20:** Độ chính xác từng trường (giá trị AI so với giá trị người chốt), tỷ lệ gợi ý trùng được chấp nhận, số lần người **nâng** mức ưu tiên so với AI, độ trễ và chi phí.
 - **AC-US21:** Tạo tài khoản bằng link mời (7 ngày, dùng một lần); vô hiệu hóa có tác dụng ở request kế tiếp; không xóa cứng.
 - **AC-US22:** Đội có tên, đội trưởng, số điện thoại, phương tiện (thuyền, xe, đi bộ), vị trí hoạt động, trạng thái (sẵn sàng, bận, nghỉ).

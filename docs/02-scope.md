@@ -4,6 +4,8 @@
 
 Tên sản phẩm (tạm thời): **SOSLink**.
 
+Ngôn ngữ giao diện: **tiếng Việt**, vì người dùng là người Việt và AI xử lý tin nhắn tiếng Việt. Riêng slide thuyết trình dùng tiếng Anh.
+
 ## 1. Phạm vi V1
 
 SOSLink V1 phục vụ **một đơn vị điều phối** (một nhóm cứu hộ, một trung tâm tình nguyện) trong **một hoặc nhiều đợt thiên tai**, gồm:

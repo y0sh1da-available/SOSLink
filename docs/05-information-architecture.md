@@ -163,7 +163,7 @@ flowchart LR
 | Báo cáo | ✓ | ✓ |
 | Quản trị | | ✓ |
 
-Thanh trên luôn hiện: **đợt thiên tai đang chọn**, số ca P1 chưa có đội, chuông cảnh báo, trạng thái kết nối. Mục không có quyền **không được render**.
+Thanh trên luôn hiện: **đợt thiên tai đang chọn**, số ca P1 chưa có đội, chuông cảnh báo (riêng trang Bản đồ hiện cảnh báo ở cột phải), trạng thái kết nối. Mục không có quyền **không được render**.
 
 **Trang công khai:** không có menu. Số **112** luôn hiện ở đầu trang.
 

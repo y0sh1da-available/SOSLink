@@ -14,8 +14,8 @@
 
 | Sự kiện | Số liệu | Nguồn |
 |---|---|---|
-| Bão Yagi, 9/2024 | 336 người chết và mất tích tính đến sáng 13/9/2024 (số tạm thời) | [RFA](https://rfa.org/vietnamese/news/vietnamnews/death-and-missing-due-to-yagi-rise-to-336-09132024093411.html) |
-| Mưa lũ cuối 11/2025 | Riêng Đắk Lắk có 113 người chết | [Tuổi Trẻ](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm) |
+| Bão Yagi, 9/2024 | 345 người chết và mất tích (323 chết, 22 mất tích), theo báo cáo của Chính phủ gửi Quốc hội, 10/2024 | [Báo Đầu tư](https://baodautu.vn/chinh-phu-bao-cao-quoc-hoi-tinh-hinh-thiet-hai-va-khac-phuc-hau-qua-bao-yagi-d228038.html) |
+| Mưa lũ cuối 11/2025 | Riêng Đắk Lắk có 113 người chết, trong đó 101 người do mưa lũ trực tiếp (UBND tỉnh, 19/12/2025) | [Tuổi Trẻ](https://tuoitre.vn/mua-lu-tai-dak-lak-lam-113-nguoi-chet-bo-cong-an-dang-dieu-tra-xa-lu-cua-thuy-dien-song-ba-ha-20251219191239907.htm) |
 
 Các con số thay đổi theo thời điểm và phạm vi thống kê. Khi đưa vào slide, cần đối chiếu với báo cáo chính thức mới nhất.
 
@@ -33,7 +33,7 @@ Các con số thay đổi theo thời điểm và phạm vi thống kê. Khi đ�
 
 | Giải pháp | Làm được gì | Điều chưa thấy trong nguồn công khai |
 |---|---|---|
-| [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) | Người dùng gửi vị trí và tình trạng, hiện chấm đỏ trên bản đồ; [có kết nối tổng đài 112](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html) | Chỉ nhận tin từ người bật tính năng; không xử lý bài đăng tự do |
+| [Zalo SOS](https://phongvu.vn/cong-nghe/?p=98453) | Người dùng gửi vị trí và tình trạng, hiện chấm đỏ trên bản đồ; [có kết nối tổng đài 112](https://nongnghiepmoitruong.vn/gan-1-ty-canh-bao-thien-tai-duoc-gui-toi-nguoi-dan-qua-zalo-d778845.html); [từ cuối 11/2025 có bản đồ](https://nongnghiepmoitruong.vn/zalo-dua-gan-1-ty-thong-bao-canh-bao-thien-tai-toi-nguoi-dan-d803703.html), lực lượng cứu hộ đánh dấu đã hỗ trợ thì chấm chuyển xanh | Chỉ nhận tin từ người bật tính năng; không xử lý bài đăng tự do |
 | [thongtincuuho.org](https://tuoitre.vn/sau-dem-lu-kinh-hoang-hai-ban-tre-am-tham-xay-ban-do-cuu-ho-cuu-nan-cho-nguoi-dan-thai-nguyen-20251008152801823.htm) (2025) | Tự quét bài đăng và bình luận, AI nhận diện địa danh, gắn điểm lên bản đồ; [gần 3.000 người dùng trong 24 giờ](https://vtcnews.vn/hai-ban-tre-lap-website-tong-hop-hang-nghin-loi-keu-cuu-giua-mua-lu-ar970052.html) | Đội cứu hộ vẫn tự mở link gốc; bài báo không nói về gộp tin trùng, xác minh, phân công và đóng ca |
 | [cuuhomientrung.info](https://tuoitre.vn/ung-dung-cong-nghe-ho-tro-cuu-ho-lu-lut-tai-dia-chi-cuuhomientrung-info-20201022122411161.htm) (2020) | Hơn 2.000 tình nguyện viên tổng hợp dữ liệu, có đường dây nóng và 30 người trực | Phụ thuộc rất nhiều vào nhân lực; không rõ trạng thái từng ca được theo dõi thế nào |
 | [totomo.org, antoanmualu.org](https://www.thiennguyen.org/group/hoat-dong-thien-nguyen/discussion/421c968b-7058-4817-b0a4-3072eb8e312f) (2025) | Tổng hợp tin cầu cứu, nút gửi vị trí GPS | Nhóm chưa đánh giá sâu |

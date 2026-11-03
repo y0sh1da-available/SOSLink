@@ -52,7 +52,7 @@ Tự quét mạng xã hội, thay thế tổng đài 112, bản đồ công khai
 
 ## 2. Product Mindmap
 
-Xem bản gốc trên Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Mỗi nhánh có một màu riêng; các ý quan trọng nhất được in đậm màu đỏ.
+Xem bản gốc trên Xmind: **[SOSLink — Product Mindmap](https://app.xmind.com/share/R30DAqtM)**. Mỗi nhánh có một màu riêng.
 
 ![SOSLink Product Mindmap](docs/mindmap/soslink-mindmap.png)
 
@@ -140,9 +140,11 @@ Screen hierarchy, 28 màn hình, route, luồng và trạng thái: [docs/05-info
 
 ## 7. UI/UX
 
-Wireframe low-fi cho 8 màn hình chính: [docs/06-ui-ux.md](docs/06-ui-ux.md).
+Thiết kế và các màn hình chính: [docs/06-ui-ux.md](docs/06-ui-ux.md). Ảnh chụp chia theo vai trò: [docs/screenshots/](docs/screenshots/README.md).
 
-![Bản đồ điều phối](docs/uiux/wf-20-command.svg)
+![Bản đồ điều phối](docs/screenshots/coordinator/scr-20-command.png)
+
+Ảnh chụp từ prototype tĩnh, chưa nối backend. **Toàn bộ dữ liệu trong ảnh là dữ liệu mẫu**, gồm tên người, đội, số điện thoại, số liệu và ca cứu hộ; vị trí trên bản đồ chỉ là ước lượng.
 
 ---
 
